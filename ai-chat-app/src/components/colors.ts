@@ -1,0 +1,1 @@
+export const titleColor = "f8fafc";
