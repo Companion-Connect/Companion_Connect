@@ -1,0 +1,160 @@
+﻿.chat-content {
+    --background: #f8f9fa;
+}
+
+.messages-container {
+    padding: 16px;
+    padding-bottom: 80px;
+}
+
+.message {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-message {
+    align-items: flex-end;
+}
+
+.ai-message {
+    align-items: flex-start;
+}
+
+.message-content {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    word-wrap: break-word;
+}
+
+.user-message .message-content {
+    background: var(--ion-color-primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.ai-message .message-content {
+    background: white;
+    color: var(--ion-color-dark);
+    border: 1px solid var(--ion-color-light);
+    border-bottom-left-radius: 4px;
+}
+
+.message-affirmation .message-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.message-question .message-content {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.message-system .message-content {
+    background: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+    font-style: italic;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    color: var(--ion-color-medium);
+    margin-top: 4px;
+    padding: 0 8px;
+}
+
+.typing .message-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid var(--ion-color-light);
+    padding: 8px;
+    z-index: 1000;
+}
+
+    .input-container ion-item {
+        --border-radius: 20px;
+        --background: #f1f3f4;
+    }
+
+.user-info {
+    padding: 8px 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.settings-panel {
+    margin: 16px;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .chat-content {
+        --background: #1a1a1a;
+    }
+
+    .ai-message .message-content {
+        background: #2d2d2d;
+        color: #ffffff;
+        border-color: #404040;
+    }
+
+    .input-container {
+        background: #1a1a1a;
+        border-top-color: #404040;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .message-content {
+        max-width: 90%;
+    }
+
+    .messages-container {
+        padding: 12px;
+    }
+}
+
+/* Animation for typing effect */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+/* Pulse animation for typing indicator */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.typing .message-content {
+    animation: pulse 1.5s infinite;
+}
