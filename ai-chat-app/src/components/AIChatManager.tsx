@@ -19,6 +19,9 @@ import {
   useIonViewWillEnter,
 } from "@ionic/react";
 
+import { logToServer } from "./logtoServer";
+
+
 import * as colors from "./colors";
 
 import {
@@ -196,6 +199,7 @@ export const AIChatManager: React.FC = () => {
         welcomeSentRef.current = true;
         setTimeout(() => {
           sendWelcomeMessage();
+          
         }, 500);
       }
     };
@@ -296,6 +300,7 @@ export const AIChatManager: React.FC = () => {
     content: string,
     isFromUser: boolean,
     messageType: string = "text"
+    
   ) => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -312,6 +317,11 @@ export const AIChatManager: React.FC = () => {
       }
       return updated;
     });
+
+    // send to Winston
+  // after you setMessages(...)
+    
+
 
     // Send notification for AI responses if app is not visible
     if (!isFromUser && document.hidden) {
@@ -447,6 +457,8 @@ export const AIChatManager: React.FC = () => {
     return response;
   };
 
+  
+
   const analyzeInputContext = (input: string): string => {
     if (
       containsAny(input, [
@@ -515,6 +527,8 @@ export const AIChatManager: React.FC = () => {
     try {
       const systemPrompt = generateSystemPrompt();
       const conversationHistory = buildConversationHistory();
+
+      
 
       const response = await fetch(
         "https://api.openai.com/v1/chat/completions",
@@ -744,6 +758,11 @@ export const AIChatManager: React.FC = () => {
 
   // Welcome message - only send once
   const sendWelcomeMessage = () => {
+    logToServer(
+      "info",
+      `${"AI"} message`,
+      {message: "Welcome!",content: "text", timestamp: Date.now() }
+    );
     const timeGreeting = getTimeBasedGreeting();
     const personalTouch = getPersonalizedTouch();
 
@@ -1277,5 +1296,9 @@ export const AIChatManager: React.FC = () => {
         }}
       />
     </IonPage>
+    
   );
 };
+
+// src/logToServer.ts
+
