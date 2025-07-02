@@ -1,0 +1,4 @@
+2025-07-02T05:11:28.407Z [info]: Express server listening on http://0.0.0.0:3000
+2025-07-02T05:11:55.999Z [info]: test log {}
+2025-07-02T05:14:17.905Z [info]: AI message {"content":"Good evening! I'm glad you're here.","messageType":"text","timestamp":"2025-07-02T05:14:17.887Z"}
+2025-07-02T05:14:20.936Z [info]: User message {"content":"YEAH BABY","messageType":"text","timestamp":"2025-07-02T05:14:20.928Z"}
