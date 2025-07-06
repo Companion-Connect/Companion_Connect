@@ -16,6 +16,7 @@ import Tab1 from "./pages/Tab1";
 import Tab2 from "./pages/Tab2";
 import Tab3 from "./pages/Tab3";
 import Tab4 from "./pages/Tab4";
+import JournalManager from "./components/journalManager";
 /* Core CSS required for Ionic components to work properly */
 import "@ionic/react/css/core.css";
 /* Basic CSS for apps built with Ionic */
@@ -54,6 +55,9 @@ const App: React.FC = () => (
 	</Route>
 	<Route exact path="/tab3">
 	  <Tab3 />
+	</Route>
+	<Route exact path="/journal">
+		<JournalManager />
 	</Route>
 	<Route exact path="/">
 	  <Redirect to="/tab1" />
@@ -98,6 +102,16 @@ const App: React.FC = () => (
 	  <IonLabel style={{ fontSize: "12px", fontWeight: "500" }}>
 		Settings
 	  </IonLabel>
+	</IonTabButton>
+	<IonTabButton tab="journal" href="/journal">
+		<IonIcon
+			aria-hidden="true"
+			icon={receiptSharp}
+			style={{ fontSize: "24px" }}
+		/>
+		<IonLabel style={{ fontSize: "12px", fontWeight: "500" }}>
+			Journal
+		</IonLabel>
 	</IonTabButton>
   </IonTabBar>
 </IonTabs>
