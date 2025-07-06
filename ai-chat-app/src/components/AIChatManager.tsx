@@ -20,7 +20,7 @@ import {
 } from "@ionic/react";
 
 import { logToServer } from "./logtoServer";
-
+import { EmojiPicker } from "./EmojiPicker";
 
 import * as colors from "./colors";
 
@@ -184,6 +184,11 @@ export const AIChatManager: React.FC = () => {
   const [hasWelcomeBeenSent, setHasWelcomeBeenSent] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
 
+  // Add emoji reaction state
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState<null | string>(null); // messageId or null
+  const [emojiSearch, setEmojiSearch] = useState("");
+  const [reactions, setReactions] = useState<{ [id: string]: string[] }>({});
+
   // Refs
   const contentRef = useRef<HTMLIonContentElement>(null);
   const welcomeSentRef = useRef(false);
@@ -339,7 +344,8 @@ export const AIChatManager: React.FC = () => {
   const sendUserMessage = async () => {
     if (!inputMessage.trim() || isTyping) return;
 
-    const userInput = inputMessage.trim();
+    let userInput = inputMessage.trim();
+    // Emoji mode: allow any input (text or emoji)
     setInputMessage("");
 
     // Add user message
@@ -866,13 +872,57 @@ export const AIChatManager: React.FC = () => {
     );
   };
 
+  // Add emoji reaction and trigger AI reply
+  const addReaction = async (messageId: string, emoji: string) => {
+    setReactions((prev) => {
+      const prevArr = prev[messageId] || [];
+      if (prevArr.includes(emoji)) return prev;
+      return { ...prev, [messageId]: [...prevArr, emoji] };
+    });
+    setEmojiPickerOpen(null);
+    setEmojiSearch("");
+    // Find the message being reacted to
+    const msg = messages.find(m => m.id === messageId);
+    if (msg && appSettings.enableEmojis) {
+      // AI replies to the reaction
+      await processUserMessage(`(User reacted to: "${msg.content}" with ${emoji})`);
+    }
+  };
+
   // Render message
   const renderMessage = (message: ChatMessage) => {
+    const canReact = appSettings.enableEmojis && !message.isFromUser;
     return (
       <div key={message.id} style={getMessageStyle(message)}>
-        <div style={getMessageContentStyle(message)}>
+        <div
+          style={{
+            ...getMessageContentStyle(message),
+            cursor: canReact ? "pointer" : undefined,
+          }}
+          onClick={() => canReact && setEmojiPickerOpen(message.id)}
+          tabIndex={canReact ? 0 : undefined}
+          role={canReact ? "button" : undefined}
+          aria-label={canReact ? "React to message" : undefined}
+        >
           <IonText>{message.content}</IonText>
+          {/* Emoji reactions display */}
+          {reactions[message.id] && reactions[message.id].length > 0 && (
+            <div style={{ marginTop: 8, display: "flex", gap: 4 }}>
+              {reactions[message.id].map((emoji, i) => (
+                <span key={i} style={{ fontSize: 22 }}>{emoji}</span>
+              ))}
+            </div>
+          )}
         </div>
+        {/* Emoji picker modal */}
+        {canReact && emojiPickerOpen === message.id && (
+          <EmojiPicker
+            onSelect={(emoji: string) => addReaction(message.id, emoji)}
+            onClose={() => setEmojiPickerOpen(null)}
+            search={emojiSearch}
+            setSearch={setEmojiSearch}
+          />
+        )}
         <div
           style={{
             fontSize: "12px",

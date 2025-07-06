@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import '../styles/JournalManager.css';
 import {
   IonPage,
   IonHeader,
@@ -12,9 +13,11 @@ import {
   IonToast,
   IonSpinner,
   IonText,
+  IonProgressBar,
 } from "@ionic/react";
 import { send, mic, micOff, download } from "ionicons/icons";
 import { Preferences } from "@capacitor/preferences";
+import { EmojiPicker } from "./EmojiPicker";
 
 interface JournalMessage {
   id: string;
@@ -62,6 +65,11 @@ const JournalManager: React.FC = () => {
   const contentRef = useRef<HTMLIonContentElement>(null);
   const starterSent = useRef(false)
 
+  const [enableEmojis, setEnableEmojis] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState<null | string>(null); // messageId or null
+  const [emojiSearch, setEmojiSearch] = useState("");
+  const [reactions, setReactions] = useState<{ [id: string]: string[] }>({});
+
   const generateStarterPrompt = async (): Promise<string> => {
     const OPENAI_API_KEY = atob("c2stcHJvai1kZ1gyN0thZHp0RnlGN3VFemc4SFZuYjVYejJtd01hU1JUQ3c4bmp2cmNFR1hhSG5iaGJ6Z0tHaXRBR2ZSZTZ6M0hYNmlRSEN5blQzQmxia0ZKczRVMHNTc19fMG81RDJmQjZoVUZERktPUU5WRlVkcUpZak5kcGJveFJzd3VsUWxpQlE2VVo5N0NPNWNpa1NBem11dVdMUkJxa0E=");
     try {
@@ -102,6 +110,30 @@ const JournalManager: React.FC = () => {
         setIsTyping(false);
       })();
     }
+  }, []);
+
+  // Load emoji setting from Preferences
+  useEffect(() => {
+    Preferences.get({ key: "chat_settings" }).then((res) => {
+      if (res.value) {
+        try {
+          const settings = JSON.parse(res.value);
+          setEnableEmojis(!!settings.enableEmojis);
+        } catch {}
+      }
+    });
+    // Listen for changes to emoji setting (optional: polling)
+    const interval = setInterval(() => {
+      Preferences.get({ key: "chat_settings" }).then((res) => {
+        if (res.value) {
+          try {
+            const settings = JSON.parse(res.value);
+            setEnableEmojis(!!settings.enableEmojis);
+          } catch {}
+        }
+      });
+    }, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const initSpeech = () => {
@@ -265,52 +297,126 @@ const JournalManager: React.FC = () => {
 
   const newTopic = async () => {
     setIsTyping(true);
+    setAiQuestionCount(0); // Reset progress bar BEFORE adding the new starter
     const starter = await generateStarterPrompt();
-    addMessage(starter, false);
+    setMessages([
+        {
+        id: Date.now().toString(),
+        content: starter,
+        isFromUser: false,
+        timestamp: new Date(),
+        },
+    ]);
     setIsTyping(false);
     setSessionEnded(false);
   };
   
-  const renderMessage = (m: JournalMessage) => (
-    <div
-      key={m.id}
-      style={{
-        display: "flex",
-        justifyContent: m.isFromUser ? "flex-end" : "flex-start",
-        padding: "4px 0",
-      }}
-    >
+  const addReaction = async (messageId: string, emoji: string) => {
+    setReactions((prev) => {
+      const prevArr = prev[messageId] || [];
+      if (prevArr.includes(emoji)) return prev;
+      return { ...prev, [messageId]: [...prevArr, emoji] };
+    });
+    setEmojiPickerOpen(null);
+    setEmojiSearch("");
+    // Find the message being reacted to
+    const msg = messages.find(m => m.id === messageId);
+    if (msg && enableEmojis) {
+      setIsTyping(true);
+      const aiReply = await callOpenAI(`(User reacted to: "${msg.content}" with ${emoji})`);
+      if (aiReply) addMessage(aiReply, false);
+      setIsTyping(false);
+    }
+  };
+
+  const renderMessage = (m: JournalMessage) => {
+    // Fix: Ensure AI messages (not from user) can always be reacted to if emojis are enabled
+    const canReact = enableEmojis && m.isFromUser === false;
+    return (
       <div
+        key={m.id}
         style={{
-          background: m.isFromUser
-            ? "linear-gradient(135deg, #667eea, #764ba2)"
-            : "#f1f5f9",
-          color: m.isFromUser ? "white" : "#1e293b",
-          borderRadius: "18px",
-          padding: "10px 16px",
-          maxWidth: "75%",
-          fontSize: "15px",
-          lineHeight: "1.5",
-          boxShadow: m.isFromUser
-            ? "0 2px 8px rgba(102,126,234,0.12)"
-            : "0 2px 8px rgba(30,41,59,0.06)",
+          display: "flex",
+          justifyContent: m.isFromUser ? "flex-end" : "flex-start",
+          padding: "4px 0",
         }}
       >
-        <IonText>{m.content}</IonText>
+        <div
+          style={{
+            background: m.isFromUser
+              ? "linear-gradient(135deg, #667eea, #764ba2)"
+              : "#f1f5f9",
+            color: m.isFromUser ? "white" : "#1e293b",
+            borderRadius: "18px",
+            padding: "10px 16px",
+            maxWidth: "75%",
+            fontSize: "15px",
+            lineHeight: "1.5",
+            boxShadow: m.isFromUser
+              ? "0 2px 8px rgba(102,126,234,0.12)"
+              : "0 2px 8px rgba(30,41,59,0.06)",
+            cursor: canReact ? "pointer" : undefined,
+          }}
+          onClick={() => canReact && setEmojiPickerOpen(m.id)}
+          tabIndex={canReact ? 0 : undefined}
+          role={canReact ? "button" : undefined}
+          aria-label={canReact ? "React to message" : undefined}
+        >
+          <IonText>{m.content}</IonText>
+          {/* Emoji reactions display */}
+          {reactions[m.id] && reactions[m.id].length > 0 && (
+            <div style={{ marginTop: 8, display: "flex", gap: 4 }}>
+              {reactions[m.id].map((emoji, i) => (
+                <span key={i} style={{ fontSize: 22 }}>{emoji}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Emoji picker modal */}
+        {canReact && emojiPickerOpen === m.id && (
+          <EmojiPicker
+            onSelect={(emoji: string) => addReaction(m.id, emoji)}
+            onClose={() => setEmojiPickerOpen(null)}
+            search={emojiSearch}
+            setSearch={setEmojiSearch}
+          />
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Progress bar: count AI replies (excluding summaries) as questions, out of 10
+  const [aiQuestionCount, setAiQuestionCount] = useState(0);
+
+  // Update question count when messages change
+  useEffect(() => {
+    // Only count AI replies that are not summaries
+    const count = messages.filter((m) => {
+      if (m.isFromUser) return false;
+      const content = m.content?.toLowerCase() || "";
+      if (
+        content.includes("summarize the following") ||
+        content.includes("session summary") ||
+        content.includes("summary unavailable")
+      ) {
+        return false;
+      }
+      return true;
+    }).length;
+    setAiQuestionCount(count > 10 ? 10 : count);
+  }, [messages]);
+  const progressValue = Math.min(aiQuestionCount / 10, 1);
 
   return (
-    <IonPage>
+    <IonPage className="journal-content">
       <IonHeader>
         <IonToolbar>
           <IonTitle>Journaling</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent ref={contentRef}>
-        <div style={{ padding: "16px", paddingBottom: "120px" }}>
-          {messages.map(renderMessage)}
+      <IonContent ref={contentRef} className="journal-content">
+        <div className="journal-messages-container">
+          {messages.map((m) => renderMessage(m))}
           {isTyping && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px" }}>
               <IonSpinner name="dots" />
@@ -389,6 +495,12 @@ const JournalManager: React.FC = () => {
           >
             Download
           </IonButton>
+        </div>
+        <div style={{ margin: "10px 0 0 0", textAlign: "center" }}>
+          <IonText color="medium" style={{ fontSize: 14 }}>
+            Conversation Depth: {aiQuestionCount} / 10
+          </IonText>
+          <IonProgressBar value={progressValue} color="primary" style={{ borderRadius: 8, marginTop: 4 }} />
         </div>
       </div>
       <IonToast
