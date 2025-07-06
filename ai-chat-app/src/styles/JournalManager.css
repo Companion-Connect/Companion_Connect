@@ -1,0 +1,61 @@
+/* JournalManager.css - match AIChatManager color scheme */
+
+.journal-content {
+    --background: #f8f9fa;
+}
+
+.journal-messages-container {
+    padding: 16px;
+    padding-bottom: 80px;
+}
+
+.journal-message {
+    display: flex;
+    flex-direction: column;
+}
+
+.journal-user-message {
+    align-items: flex-end;
+}
+
+.journal-ai-message {
+    align-items: flex-start;
+}
+
+.journal-message-content {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    word-wrap: break-word;
+}
+
+.journal-user-message .journal-message-content {
+    background: var(--ion-color-primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.journal-ai-message .journal-message-content {
+    background: white;
+    color: var(--ion-color-dark);
+    border: 1px solid var(--ion-color-light);
+    border-bottom-left-radius: 4px;
+}
+
+.journal-message-affirmation .journal-message-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.journal-message-question .journal-message-content {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.journal-message-system .journal-message-content {
+    background: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+    font-style: italic;
+}
