@@ -39,6 +39,29 @@ import {
   brush,
 } from 'ionicons/icons';
 import { Preferences } from '@capacitor/preferences';
+import { StorageUtil } from '../utils/storage.utils';
+import { trophyOutline, checkmarkCircle, checkmarkCircleOutline, flameOutline, flame } from 'ionicons/icons';
+const DISPLAY_BADGE_KEY = 'display_badge_id';
+// Badge types and initial badges (copied from ChallengeGamification)
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  unlocked: boolean;
+  icon: string;
+  colorIcon: string;
+}
+
+const BADGES_KEY = 'challenge_badges';
+const initialBadges: Badge[] = [
+  { id: 'streak10', name: '10-Week Streak', description: 'Get a streak of 10', unlocked: false, icon: flameOutline, colorIcon: flame },
+  { id: 'streak4', name: '4-Week Streak', description: 'Get a streak of 4', unlocked: false, icon: flameOutline, colorIcon: flame },
+  { id: 'streak1', name: 'First Streak', description: 'Get your first streak', unlocked: false, icon: flameOutline, colorIcon: flame },
+  { id: 'setGoal', name: 'Goal Setter', description: 'Set a new goal', unlocked: false, icon: checkmarkCircleOutline, colorIcon: checkmarkCircle },
+  { id: 'completeChallenge', name: 'First Challenge', description: 'Complete your first weekly challenge', unlocked: false, icon: trophyOutline, colorIcon: trophyOutline },
+  { id: 'goalMaster', name: 'Goal Master', description: 'Complete 10 goals', unlocked: false, icon: checkmarkCircleOutline, colorIcon: checkmarkCircle },
+  { id: 'challenge5', name: '5 Challenges', description: 'Complete 5 challenges', unlocked: false, icon: trophyOutline, colorIcon: trophyOutline },
+];
 import '../styles/responsive.css';
 
 // Types
@@ -100,10 +123,59 @@ const SettingsPage: React.FC = () => {
 
   const [editingProfile, setEditingProfile] = useState(false);
   const [tempProfile, setTempProfile] = useState<UserProfile>(defaultUserProfile);
+  const [goals, setGoals] = useState<string[]>([]);
+  // Load goals from ChallengeGamification storage (only incomplete goals)
+  useEffect(() => {
+    (async () => {
+      const storedGoals = await StorageUtil.get<any[]>('challenge_goals', []);
+      // Only use text of incomplete goals
+      setGoals((storedGoals || []).filter((g: any) => !g.completed).map((g: any) => g.text));
+    })();
+  }, []);
+
+  // Settings page goals are independent and only for profile display
+  const [profileGoals, setProfileGoals] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      const stored = await Preferences.get({ key: 'profile_goals' });
+      if (stored.value) setProfileGoals(JSON.parse(stored.value));
+    })();
+  }, []);
+
+  // Interests are now independent and only for profile display
+  const [profileInterests, setProfileInterests] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      const stored = await Preferences.get({ key: 'profile_interests' });
+      if (stored.value) setProfileInterests(JSON.parse(stored.value));
+    })();
+  }, []);
+
+  // When opening modal, sync tempProfile.goals with Challenge goals
+  const openProfileModal = () => {
+    setTempProfile(profile => ({ ...profile, goals: profileGoals, interests: profileInterests }));
+    setEditingProfile(true);
+  };
   const [newInterest, setNewInterest] = useState('');
   const [newGoal, setNewGoal] = useState('');
+  const [badges, setBadges] = useState<Badge[]>(initialBadges);
+  const [displayBadgeId, setDisplayBadgeId] = useState<string | null>(null);
+  // Load display badge from storage
+  useEffect(() => {
+    (async () => {
+      const storedId = await StorageUtil.get<string>(DISPLAY_BADGE_KEY);
+      setDisplayBadgeId(storedId || null);
+    })();
+  }, []);
   const modalRef = useRef<HTMLIonModalElement>(null);
   const pageRef = useRef<HTMLElement>(null);
+  // Load badges from storage
+  useEffect(() => {
+    (async () => {
+      const storedBadges = await StorageUtil.get<Badge[]>(BADGES_KEY, initialBadges);
+      setBadges(storedBadges || initialBadges);
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -145,9 +217,14 @@ const SettingsPage: React.FC = () => {
 
   const openModal = () => { setTempProfile(profile); setEditingProfile(true); };
   const closeModal = () => setEditingProfile(false);
+  // Save profile and update Challenge goals
   const saveProfile = async () => {
     setProfile(tempProfile);
     await Preferences.set({ key: 'user_profile', value: JSON.stringify(tempProfile) });
+    await Preferences.set({ key: 'profile_goals', value: JSON.stringify(tempProfile.goals || []) });
+    setProfileGoals(tempProfile.goals || []);
+    await Preferences.set({ key: 'profile_interests', value: JSON.stringify(tempProfile.interests || []) });
+    setProfileInterests(tempProfile.interests || []);
     setEditingProfile(false);
   };
   const saveSettings = async (ns: AppSettings) => {
@@ -164,12 +241,46 @@ const SettingsPage: React.FC = () => {
       </IonHeader>
       <IonContent fullscreen>
         {/* Profile Card */}
-        <IonCard button onClick={openModal} style={{ margin: 20 }}>
+        <IonCard button onClick={openProfileModal} style={{ margin: 20 }}>
           <IonCardContent style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2>{profile.userName || 'Your Profile'}</h2>
-              <p>Relationship: {profile.relationshipLevel}</p>
-              {profile.MBTI && <p>MBTI Type: <strong>{profile.MBTI}</strong></p>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div>
+                <h2>{profile.userName || 'Your Profile'}</h2>
+                <p>Relationship: {profile.relationshipLevel}</p>
+                {profile.MBTI && <p>MBTI Type: <strong>{profile.MBTI}</strong></p>}
+                {/* Profile Goals Display */}
+                {profileGoals.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <span style={{ fontWeight: 500, fontSize: 13 }}>My Goals:</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {profileGoals.map(g => (
+                        <IonChip key={g} color="primary" style={{ fontSize: 12 }}>{g}</IonChip>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Profile Interests Display */}
+                {profileInterests.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <span style={{ fontWeight: 500, fontSize: 13 }}>My Interests:</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {profileInterests.map(i => (
+                        <IonChip key={i} color="secondary" style={{ fontSize: 12 }}>{i}</IonChip>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {displayBadgeId && badges.length > 0 && (() => {
+                const badge = badges.find(b => b.id === displayBadgeId && b.unlocked);
+                if (!badge) return null;
+                return (
+                  <div style={{ textAlign: 'center', marginLeft: 8 }}>
+                    <IonIcon icon={badge.colorIcon} style={{ fontSize: 32, color: 'orange' }} />
+                    <div style={{ fontSize: 10, color: '#10b981' }}>Display Badge</div>
+                  </div>
+                );
+              })()}
             </div>
             <IonAvatar><IonIcon icon={person} /></IonAvatar>
           </IonCardContent>
@@ -327,17 +438,21 @@ const SettingsPage: React.FC = () => {
                 />
                 <IonButton onClick={() => {
                   if (newInterest.trim()) {
-                    setTempProfile({ ...tempProfile, interests: [...tempProfile.interests, newInterest.trim()] });
+                    const updatedInterests = [...(tempProfile.interests || []), newInterest.trim()];
+                    setTempProfile({ ...tempProfile, interests: updatedInterests });
                     setNewInterest('');
                   }
                 }}>Add</IonButton>
               </div>
             </IonItem>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>   
-              {tempProfile.interests.map(i => (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
+              {(tempProfile.interests || []).map(i => (
                 <IonChip key={i}>
                   {i}
-                  <IonIcon icon={close} onClick={() => setTempProfile({ ...tempProfile, interests: tempProfile.interests.filter(x => x !== i) })} />
+                  <IonIcon icon={close} onClick={() => {
+                    const updatedInterests = (tempProfile.interests || []).filter(x => x !== i);
+                    setTempProfile({ ...tempProfile, interests: updatedInterests });
+                  }} />
                 </IonChip>
               ))}
             </div>
@@ -354,17 +469,21 @@ const SettingsPage: React.FC = () => {
                 />
                 <IonButton onClick={() => {
                   if (newGoal.trim()) {
-                    setTempProfile({ ...tempProfile, goals: [...tempProfile.goals, newGoal.trim()] });
+                    const updatedGoals = [...(tempProfile.goals || []), newGoal.trim()];
+                    setTempProfile({ ...tempProfile, goals: updatedGoals });
                     setNewGoal('');
                   }
                 }}>Add</IonButton>
               </div>
             </IonItem>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
-              {tempProfile.goals.map(g => (
+              {(tempProfile.goals || []).map(g => (
                 <IonChip key={g}>
                   {g}
-                  <IonIcon icon={close} onClick={() => setTempProfile({ ...tempProfile, goals: tempProfile.goals.filter(x => x !== g) })} />
+                  <IonIcon icon={close} onClick={() => {
+                    const updatedGoals = (tempProfile.goals || []).filter(x => x !== g);
+                    setTempProfile({ ...tempProfile, goals: updatedGoals });
+                  }} />
                 </IonChip>
               ))}
             </div>
@@ -381,6 +500,21 @@ const SettingsPage: React.FC = () => {
                 <IonSelectOption value='close'>Best Friend</IonSelectOption>
               </IonSelect>
             </IonItem>
+            {/* Badges Section */}
+            <div style={{ margin: '32px 0 0 0', padding: 0 }}>
+              <IonLabel style={{ fontWeight: 600, fontSize: 16, marginBottom: 8, display: 'block', textAlign: 'center' }}>My Badges</IonLabel>
+              <div style={{ display: 'flex', gap: 16, marginTop: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {badges.filter(b => b.unlocked).length === 0 && (
+                  <span style={{ color: '#888', fontSize: 14 }}>No badges earned yet.</span>
+                )}
+                {badges.filter(b => b.unlocked).map(badge => (
+                  <div key={badge.id} style={{ textAlign: 'center' }}>
+                    <IonIcon icon={badge.colorIcon} style={{ fontSize: 32, color: 'orange' }} />
+                    <div style={{ fontSize: 12 }}>{badge.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </IonContent>
         </IonModal>
       </IonContent>

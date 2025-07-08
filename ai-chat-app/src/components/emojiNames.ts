@@ -706,4 +706,10 @@ export const emojiNameMap: { [emoji: string]: string[] } = {
   "📠": ["fax machine", "electronics"],
   "💻": ["laptop", "computer", "electronics"],
   "🖥️": ["desktop computer", "computer", "electronics"],
+  "✅": ["check mark", "check", "symbol", "correct", "green"],
+  "☑️": ["check mark", "check", "symbol", "correct", "purple"],
+  "✔️": ["check mark", "check", "symbol", "correct", "purple"],
+  "❎": ["cross mark", "x", "symbol", "incorrect", "green", "wrong"],
+  "✖️": ["cross mark", "x", "symbol", "incorrect", "purple", "wrong"],
+  "❓": ["question mark", "question", "symbol", "red", "?"],
 };
