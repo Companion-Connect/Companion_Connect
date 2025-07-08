@@ -1,3 +1,4 @@
+import ChallengeGamification from '../components/ChallengeGamification';
 // src/AppTabs.tsx
 import React from 'react';
 import {
@@ -13,36 +14,22 @@ import { IonReactRouter } from '@ionic/react-router';
 import { chatbubblesOutline, settingsOutline } from 'ionicons/icons';
 import { Route, Redirect } from 'react-router-dom';
 
-import NotificationAutoStart from '../components/MyNotifier';
 
-const AppTabs: React.FC = () => (
-  <IonApp>
-    <IonReactRouter>
-      <NotificationAutoStart />
-      <IonTabs>
-        <IonRouterOutlet>
-          {/* Challenges Tab */}
-          <Route exact path="/challenges">
-        {/* NotificationAutoStart is now started globally above */}
-          </Route>
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
 
-          {/* Redirect root → challenges */}
-          <Route exact path="/">
-        <Redirect to="/challenges" />
-          </Route>
-        </IonRouterOutlet>
+const Tab2: React.FC = () => {
+  return (
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>Challenge</IonTitle>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent fullscreen>
+        <ChallengeGamification />
+      </IonContent>
+    </IonPage>
+  );
+};
 
-        <IonTabBar slot="bottom">
-          <IonTabButton tab="challenges" href="/challenges">
-        <IonIcon icon={chatbubblesOutline} />
-        <IonLabel>Challenges</IonLabel>
-          </IonTabButton>
-        </IonTabBar>
-      </IonTabs>
-      
-    </IonReactRouter>
-    
-  </IonApp>
-);
-
-export default AppTabs;
+export default Tab2;
