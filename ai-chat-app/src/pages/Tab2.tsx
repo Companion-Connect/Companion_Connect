@@ -1,5 +1,4 @@
 import ChallengeGamification from '../components/ChallengeGamification';
-// src/AppTabs.tsx
 import React from 'react';
 import {
   IonApp,

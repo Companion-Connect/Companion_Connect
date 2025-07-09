@@ -1,9 +1,9 @@
+import { celebrateBadge } from './confettiUtil';
 import React, { useState, useEffect } from 'react';
 import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonInput, IonList, IonItem, IonLabel, IonCheckbox, IonGrid, IonRow, IonCol, IonIcon, IonBadge } from '@ionic/react';
 import { StorageUtil } from '../utils/storage.utils';
 import { trophyOutline, checkmarkCircle, checkmarkCircleOutline, flameOutline, flame } from 'ionicons/icons';
 
-// Types
 
 interface Goal {
   id: string;
@@ -70,7 +70,6 @@ const ChallengeGamification: React.FC = () => {
   const [loaded, setLoaded] = useState(false);
   const [completedChallenges, setCompletedChallenges] = useState(0);
 
-  // Get week number
   function getWeekNumber(d: Date) {
     d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     const dayNum = d.getUTCDay() || 7;
@@ -79,7 +78,6 @@ const ChallengeGamification: React.FC = () => {
     return Math.ceil(((d.getTime() - yearStart.getTime())/86400000+1)/7);
   }
 
-  // Load progress from storage
   useEffect(() => {
     (async () => {
       const [storedGoals, storedStreak, storedBadges, storedLastCompleted, storedWeekly, storedWeeklyWeek, storedCompletedChallenges] = await Promise.all([
@@ -97,11 +95,9 @@ const ChallengeGamification: React.FC = () => {
       setLastCompleted(storedLastCompleted);
       setCompletedChallenges(storedCompletedChallenges || 0);
 
-      // Weekly challenge logic
       const now = new Date();
       const thisWeek = getWeekNumber(now);
       if (!storedWeekly || storedWeeklyWeek !== thisWeek) {
-        // Pick a new challenge for this week
         const random = socialChallenges[Math.floor(Math.random() * socialChallenges.length)];
         setWeeklyChallenge(random);
         StorageUtil.set(WEEKLY_CHALLENGE_KEY, random);
@@ -109,7 +105,6 @@ const ChallengeGamification: React.FC = () => {
         setWeeklyCompleted(false);
       } else {
         setWeeklyChallenge(storedWeekly);
-        // Check if already completed this week
         if (storedLastCompleted) {
           const last = new Date(storedLastCompleted);
           const lastWeek = getWeekNumber(last);
@@ -120,8 +115,6 @@ const ChallengeGamification: React.FC = () => {
     })();
   }, []);
 
-  // Save progress to storage
-  // Only save after initial load
   useEffect(() => {
     if (!loaded) return;
     StorageUtil.set(GOALS_KEY, goals);
@@ -143,7 +136,6 @@ const ChallengeGamification: React.FC = () => {
     StorageUtil.set(CHALLENGES_COMPLETED_KEY, completedChallenges);
   }, [completedChallenges, loaded]);
 
-  // Add a new goal
   const handleAddGoal = () => {
     if (newGoal.trim() === '') return;
     const newGoalObj: Goal = { id: Date.now().toString(), text: newGoal, completed: false };
@@ -152,16 +144,13 @@ const ChallengeGamification: React.FC = () => {
     unlockBadge('setGoal');
   };
 
-  // Complete a goal
   const handleCompleteGoal = (id: string) => {
     const updatedGoals = goals.map(goal => goal.id === id ? { ...goal, completed: !goal.completed } : goal);
     setGoals(updatedGoals);
-    // Unlock Goal Master badge if 10 or more completed
     const completedCount = updatedGoals.filter(g => g.completed).length;
     if (completedCount >= 10) unlockBadge('goalMaster');
   };
 
-  // Mark challenge as completed
   const handleMarkAsCompleted = () => {
     if (!weeklyChallenge || weeklyCompleted) return;
     let newStreak = streak;
@@ -174,14 +163,12 @@ const ChallengeGamification: React.FC = () => {
       if (newStreak === 4) unlockBadge('streak4');
       if (newStreak === 10) unlockBadge('streak10');
     }
-    // Count total completed challenges for challenge5 badge
     const newCompletedChallenges = completedChallenges + 1;
     setCompletedChallenges(newCompletedChallenges);
     if (newCompletedChallenges >= 5) unlockBadge('challenge5');
     setWeeklyCompleted(true);
   };
 
-  // Get a new challenge (only after completed)
   const handleGetNewChallenge = () => {
     if (!weeklyCompleted) return;
     const now = new Date();
@@ -192,13 +179,11 @@ const ChallengeGamification: React.FC = () => {
     StorageUtil.set(WEEKLY_CHALLENGE_KEY, random);
     StorageUtil.set(WEEKLY_CHALLENGE_WEEK_KEY, thisWeek);
     setWeeklyCompleted(false);
-    // Show notification if enabled
     if (notificationPermission === 'granted' && random) {
       showNotification(random);
     }
   };
 
-  // Notification logic
   useEffect(() => {
     if ('Notification' in window) {
       setNotificationPermission(Notification.permission);
@@ -223,7 +208,6 @@ const ChallengeGamification: React.FC = () => {
     }
   };
 
-  // Check if streak already counted for this week
   const isStreakAlreadyCounted = () => {
     if (!lastCompleted) return false;
     const last = new Date(lastCompleted);
@@ -233,7 +217,6 @@ const ChallengeGamification: React.FC = () => {
     return lastWeek === thisWeek;
   };
 
-  // Lose streak if not completed by next week
   useEffect(() => {
     if (!lastCompleted) return;
     const interval = setInterval(() => {
@@ -245,16 +228,12 @@ const ChallengeGamification: React.FC = () => {
         setStreak(0);
         setWeeklyCompleted(false);
       }
-    }, 1000 * 60 * 60); // check every hour
+    }, 1000 * 60 * 60);
     return () => clearInterval(interval);
   }, [lastCompleted]);
 
-  // Unlock a badge
-
-  // Badge popup state
   const [badgePopup, setBadgePopup] = useState<{ id: string; name: string; description: string } | null>(null);
   const [displayBadgeId, setDisplayBadgeId] = useState<string | null>(null);
-  // Load display badge from storage
   useEffect(() => {
     (async () => {
       const storedId = await StorageUtil.get<string>('display_badge_id');
@@ -263,7 +242,14 @@ const ChallengeGamification: React.FC = () => {
   }, []);
 
   const unlockBadge = (id: string) => {
-    setBadges(badges => badges.map(b => b.id === id ? { ...b, unlocked: true } : b));
+    setBadges(badges => {
+      const updated = badges.map(b => b.id === id ? { ...b, unlocked: true } : b);
+      const justUnlocked = updated.find(b => b.id === id && b.unlocked && !badges.find(old => old.id === id)?.unlocked);
+      if (justUnlocked) {
+        celebrateBadge(justUnlocked.name);
+      }
+      return updated;
+    });
   };
 
   return (
