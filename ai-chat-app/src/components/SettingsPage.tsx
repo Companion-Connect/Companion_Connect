@@ -42,7 +42,6 @@ import { Preferences } from '@capacitor/preferences';
 import { StorageUtil } from '../utils/storage.utils';
 import { trophyOutline, checkmarkCircle, checkmarkCircleOutline, flameOutline, flame } from 'ionicons/icons';
 const DISPLAY_BADGE_KEY = 'display_badge_id';
-// Badge types and initial badges (copied from ChallengeGamification)
 interface Badge {
   id: string;
   name: string;
@@ -64,7 +63,6 @@ const initialBadges: Badge[] = [
 ];
 import '../styles/responsive.css';
 
-// Types
 interface UserProfile {
   userName: string;
   userAge: number;
@@ -124,25 +122,18 @@ const SettingsPage: React.FC = () => {
   const [editingProfile, setEditingProfile] = useState(false);
   const [tempProfile, setTempProfile] = useState<UserProfile>(defaultUserProfile);
   const [goals, setGoals] = useState<string[]>([]);
-  // Load goals from ChallengeGamification storage (only incomplete goals)
   useEffect(() => {
-    (async () => {
+    const loadGoals = async () => {
       const storedGoals = await StorageUtil.get<any[]>('challenge_goals', []);
-      // Only use text of incomplete goals
       setGoals((storedGoals || []).filter((g: any) => !g.completed).map((g: any) => g.text));
-    })();
+    };
+    loadGoals();
+    
+    const handler = () => loadGoals();
+    window.addEventListener('goals-updated', handler);
+    return () => window.removeEventListener('goals-updated', handler);
   }, []);
-
-  // Settings page goals are independent and only for profile display
-  const [profileGoals, setProfileGoals] = useState<string[]>([]);
-  useEffect(() => {
-    (async () => {
-      const stored = await Preferences.get({ key: 'profile_goals' });
-      if (stored.value) setProfileGoals(JSON.parse(stored.value));
-    })();
-  }, []);
-
-  // Interests are now independent and only for profile display
+  
   const [profileInterests, setProfileInterests] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
@@ -151,16 +142,14 @@ const SettingsPage: React.FC = () => {
     })();
   }, []);
 
-  // When opening modal, sync tempProfile.goals with Challenge goals
   const openProfileModal = () => {
-    setTempProfile(profile => ({ ...profile, goals: profileGoals, interests: profileInterests }));
+    setTempProfile(profile => ({ ...profile, goals: goals, interests: profileInterests }));
     setEditingProfile(true);
   };
   const [newInterest, setNewInterest] = useState('');
   const [newGoal, setNewGoal] = useState('');
   const [badges, setBadges] = useState<Badge[]>(initialBadges);
   const [displayBadgeId, setDisplayBadgeId] = useState<string | null>(null);
-  // Load display badge from storage
   useEffect(() => {
     (async () => {
       const storedId = await StorageUtil.get<string>(DISPLAY_BADGE_KEY);
@@ -169,7 +158,6 @@ const SettingsPage: React.FC = () => {
   }, []);
   const modalRef = useRef<HTMLIonModalElement>(null);
   const pageRef = useRef<HTMLElement>(null);
-  // Load badges from storage
   useEffect(() => {
     (async () => {
       const storedBadges = await StorageUtil.get<Badge[]>(BADGES_KEY, initialBadges);
@@ -217,14 +205,21 @@ const SettingsPage: React.FC = () => {
 
   const openModal = () => { setTempProfile(profile); setEditingProfile(true); };
   const closeModal = () => setEditingProfile(false);
-  // Save profile and update Challenge goals
   const saveProfile = async () => {
     setProfile(tempProfile);
     await Preferences.set({ key: 'user_profile', value: JSON.stringify(tempProfile) });
-    await Preferences.set({ key: 'profile_goals', value: JSON.stringify(tempProfile.goals || []) });
-    setProfileGoals(tempProfile.goals || []);
     await Preferences.set({ key: 'profile_interests', value: JSON.stringify(tempProfile.interests || []) });
     setProfileInterests(tempProfile.interests || []);
+    const storedGoals = await StorageUtil.get<any[]>('challenge_goals', []);
+    const completedGoals = (storedGoals || []).filter((g: any) => g.completed);
+    const newGoals = (tempProfile.goals || []).map((text: string) => {
+      const existing = (storedGoals || []).find((g: any) => g.text === text);
+      return existing ? existing : { id: Date.now().toString() + Math.random().toString(36).slice(2), text, completed: false };
+    });
+    const updatedGoals = [...newGoals, ...completedGoals];
+    await StorageUtil.set('challenge_goals', updatedGoals);
+    window.dispatchEvent(new Event('goals-updated'));
+    setGoals(newGoals.map(g => g.text));
     setEditingProfile(false);
   };
   const saveSettings = async (ns: AppSettings) => {
@@ -249,11 +244,11 @@ const SettingsPage: React.FC = () => {
                 <p>Relationship: {profile.relationshipLevel}</p>
                 {profile.MBTI && <p>MBTI Type: <strong>{profile.MBTI}</strong></p>}
                 {/* Profile Goals Display */}
-                {profileGoals.length > 0 && (
+                {goals.length > 0 && (
                   <div style={{ marginTop: 8 }}>
                     <span style={{ fontWeight: 500, fontSize: 13 }}>My Goals:</span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                      {profileGoals.map(g => (
+                      {goals.map(g => (
                         <IonChip key={g} color="primary" style={{ fontSize: 12 }}>{g}</IonChip>
                       ))}
                     </div>
