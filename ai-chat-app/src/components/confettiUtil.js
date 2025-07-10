@@ -32,12 +32,14 @@ export function celebrateBadge(badgeName, badgeIcon = '🏅') {
   congrats.style.fontWeight = 'bold';
   congrats.style.fontSize = '2rem';
   congrats.style.marginBottom = '10px';
+  congrats.style.color = 'orange';
 
   const earned = document.createElement('div');
   earned.innerText = `You earned the "${badgeName}" badge!`;
   earned.style.fontSize = '1.2rem';
   earned.style.textAlign = 'center';
   earned.style.marginBottom = '18px';
+  earned.style.color = 'orange';
 
   const btn = document.createElement('button');
   btn.innerText = 'Close';
