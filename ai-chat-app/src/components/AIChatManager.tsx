@@ -762,6 +762,21 @@ export const AIChatManager: React.FC = () => {
     return interestKeywords.filter((keyword) => input.includes(keyword));
   };
 
+
+  // List of insightful/positive quotes
+  const welcomeQuotes = [
+    { quote: "Every day is a new beginning. Take a deep breath, smile, and start again.", person: "Unknown" },
+    { quote: "You are capable of amazing things.", person: "Unknown" },
+    { quote: "Believe in yourself and all that you are.", person: "Christian D. Larson" },
+    { quote: "Difficult roads often lead to beautiful destinations.", person: "Zig Ziglar" },
+    { quote: "Your potential is endless.", person: "Unknown" },
+    { quote: "Small steps every day lead to big changes.", person: "Unknown" },
+    { quote: "You are stronger than you think.", person: "Unknown" },
+    { quote: "The best time for new beginnings is now.", person: "Unknown" },
+    { quote: "Be proud of how far you've come, and have faith in how far you can go.", person: "Unknown" },
+    { quote: "Happiness is not by chance, but by choice.", person: "Jim Rohn" }
+  ];
+
   // Welcome message - only send once
   const sendWelcomeMessage = () => {
     logToServer(
@@ -769,16 +784,10 @@ export const AIChatManager: React.FC = () => {
       `${"AI"} message`,
       {message: "Welcome!",content: "text", timestamp: Date.now() }
     );
-    const timeGreeting = getTimeBasedGreeting();
-    const personalTouch = getPersonalizedTouch();
-
-    let welcomeMessage = `${timeGreeting}!`;
-    if (userProfile.userName) {
-      welcomeMessage += ` ${userProfile.userName}!`;
-    }
-    welcomeMessage += ` ${personalTouch}`;
-
-    addMessage(welcomeMessage, false);
+    // Pick a random quote for the welcome message
+    const selected = welcomeQuotes[Math.floor(Math.random() * welcomeQuotes.length)];
+    const formatted = `"${selected.quote}" - ${selected.person}`;
+    addMessage(formatted, false);
   };
 
   const getTimeBasedGreeting = (): string => {
