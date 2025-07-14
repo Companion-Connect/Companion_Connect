@@ -786,7 +786,7 @@ export const AIChatManager: React.FC = () => {
     );
     // Pick a random quote for the welcome message
     const selected = welcomeQuotes[Math.floor(Math.random() * welcomeQuotes.length)];
-    const formatted = `"${selected.quote}" - ${selected.person}`;
+    const formatted = `"${selected.quote}" - ${selected.person}. How can I help you today?`;
     addMessage(formatted, false);
   };
 
