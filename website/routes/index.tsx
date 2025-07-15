@@ -267,6 +267,134 @@ export default function Home() {
           </li>
         </ul>
         <hr class="w-full my-4" style="border-color: rgb(0, 0, 0); border-width: 2px;" />
+        <p class="w-full" style="margin-top: 1rem; font-size: 2rem; color:rgb(81, 55, 55); text-align: left;">
+          Existential Loneliness
+        </p>
+        <p class="w-full" style="margin-top: 0.5rem; font-size: 1.5rem; color:rgb(81, 55, 55); text-align: left;">
+          What it is
+        </p>
+        <p class="w-full" style="font-size: 1rem; color:rgb(81, 55, 55); text-align: left;">
+          A deep sense that no one can truly share your inner universe; it often pops up at 3 a.m. or after a loss.(   
+        <span style="font-size: 1rem; color:rgb(56, 54, 188);">
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9553172/?utm_source=chatgpt.com">PMC</a>
+        </span>
+        <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+          ,&nbsp;
+        </span>
+        <span style="font-size: 1rem; color:rgb(56, 54, 188);">
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10664587/?utm_source=chatgpt.com">PMC</a>
+        </span>
+        <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+          )
+        </span>
+        </p>
+        <p class="w-full" style="margin-top: 0.5rem; font-size: 1.5rem; color:rgb(81, 55, 55); text-align: left;">
+          Why young people feel it
+        </p>
+        <p style="font-size: 1rem; color:rgb(81, 55, 55);">
+          Adolescence is when identity and meaning questions hit full force, magnifying this “cosmic” isolation.(
+        <span style="font-size: 1rem; color:rgb(56, 54, 188);">
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9553172/?utm_source=chatgpt.com">PMC</a>
+        </span>
+        <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+          ) Serious illness, family bereavement, or even pandemic headlines can trigger thoughts about mortality and purpose.(
+        </span>
+        <span style="font-size: 1rem; color:rgb(56, 54, 188);">
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10664587/?utm_source=chatgpt.com">PMC</a>
+        </span>
+        <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+          )
+        </span>
+        </p>
+        <p class="w-full" style="margin-top: 0.5rem; font-size: 1.5rem; color:rgb(81, 55, 55); text-align: left;">
+          Health impact
+        </p>
+        <p style="font-size: 1rem; color:rgb(81, 55, 55);">
+          High existential isolation correlates with sharper spikes in depression and self-harm ideation than social loneliness alone.(
+        <span style="font-size: 1rem; color:rgb(56, 54, 188);">
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10664587/?utm_source=chatgpt.com">PMC</a>
+        </span>
+        <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+          )
+        </span>
+        </p>
+        <p class="w-full" style="margin-top: 0.5rem; font-size: 1.5rem; color:rgb(81, 55, 55); text-align: left;">
+          Quick wins
+        </p>
+        <ul style={{ paddingLeft: "2rem" }}>
+          <li style={{ fontSize: "1.2rem", listStyleType: "disc" }}>
+            <span style="font-size: 1rem; color:rgb(0, 0, 0); font-weight: bold;">
+              Meaning log
+            </span>
+            <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+              : Each night, jot one moment that felt purposeful—helped a friend, aced a sketch, finished a workout. Over weeks this builds an antidote narrative.(
+            </span>
+            <span style="font-size: 1rem; color:rgb(56, 54, 188);">
+              <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10664587/?utm_source=chatgpt.com">PMC</a>
+            </span>
+            <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+              )
+            </span>
+          </li>
+          <li style={{ fontSize: "1.2rem", listStyleType: "disc" }}>
+            <span style="font-size: 1rem; color:rgb(0, 0, 0); font-weight: bold;">
+              Existential chats
+            </span>
+            <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+              : Discuss big questions in youth group, philosophy club, or with a therapist; naming the void decreases its power.
+            </span>
+          </li>
+          <li style={{ fontSize: "1.2rem", listStyleType: "disc" }}>
+            <span style="font-size: 1rem; color:rgb(0, 0, 0); font-weight: bold;">
+              Embodied awe
+            </span>
+            <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+              : 20-minute phone-free nature walks reduce rumination and boost connectedness.(
+            </span>
+            <span style="font-size: 1rem; color:rgb(56, 54, 188);">
+              <a href="https://www.psychologytoday.com/us/blog/the-mysteries-of-love/202408/understanding-chronic-loneliness-in-adolescence?utm_source=chatgpt.com">Psychology Today</a>
+            </span>
+            <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+              )
+            </span>
+          </li>
+        </ul>
+        <p class="w-full" style="margin-top: 1rem; font-size: 2rem; color:rgb(81, 55, 55); text-align: left;">
+          How Companion Connect Can Help
+        </p>
+        <ul style={{ paddingLeft: "2rem" }}>
+          <li><span style={{ fontSize: "2rem", color:"rgb(0, 0, 0)" }}>1.</span>
+              <span style="font-size: 1rem; color:rgb(0, 0, 0); font-weight: bold;">
+                Peer Circles&nbsp;
+              </span>
+              <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+                – Small, weekly video groups that blend emotional check-ins and goal-setting, giving you both confidants and a tribe.
+              </span>
+          </li>
+          <li><span style={{ fontSize: "2rem", color:"rgb(0, 0, 0)" }}>2.</span>
+              <span style="font-size: 1rem; color:rgb(0, 0, 0); font-weight: bold;">
+                AI Mood Check App&nbsp;
+              </span>
+              <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+                Private journaling prompts that spot early warning signs of any loneliness type and nudge you toward support.
+              </span>
+          </li>
+          <li><span style={{ fontSize: "2rem", color:"rgb(0, 0, 0)" }}>3.</span>
+              <span style="font-size: 1rem; color:rgb(0, 0, 0); font-weight: bold;">
+                Purpose Projects&nbsp;
+              </span>
+              <span style="font-size: 1rem; color:rgb(81, 55, 55);">
+                – Volunteer teams where you can turn existential questions into real-world impact.
+              </span>
+          </li>
+        </ul>
+        <hr class="w-full my-4" style="border-color: rgb(0, 0, 0); border-width: 2px;" />
+        <p class="w-full" style="margin-top: 0.5rem; font-size: 1.5rem; color:rgb(81, 55, 55); text-align: left;">
+          Takeaway
+        </p>
+        <p style="font-size: 1rem; color:rgb(81, 55, 55);">
+          Loneliness isn’t a single switch—it’s a spectrum. Emotional, social, and existential gaps all hurt in different ways, but each can be bridged with the right mix of vulnerability, community, and meaning. If any of these descriptions hit home, reach out—whether to a friend, counselor, or Companion Connect. No one else can live your life, but none of us has to brave it entirely alone.
+        </p>
       </div>
     </div>
   );
