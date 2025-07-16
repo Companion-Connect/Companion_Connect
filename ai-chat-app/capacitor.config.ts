@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.yourcompany.aicompanion',
-  appName: 'AI Companion',
+  appName: 'App',
   webDir: 'dist',
   server: {
     androidScheme: 'https'
