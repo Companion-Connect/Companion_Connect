@@ -265,7 +265,18 @@ const ChallengeGamification: React.FC = () => {
               {/* Badges */}
               <div style={{ marginBottom: 24 }}>
                 <strong>Badges:</strong>
-                <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                <div style={{
+                  display: 'flex',
+                  gap: 16,
+                  marginTop: 8,
+                  overflowX: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  paddingBottom: 8,
+                  scrollbarWidth: 'thin',
+                  msOverflowStyle: 'auto',
+                  // Hide scrollbar for Webkit browsers
+                  // You can add a custom scrollbar style if desired
+                }}>
                   {badges.map(badge => (
                     <div key={badge.id} style={{ textAlign: 'center', cursor: 'pointer', position: 'relative', display: 'inline-block' }}>
                       <div
