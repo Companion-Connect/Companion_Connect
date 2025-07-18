@@ -1,3 +1,25 @@
+import { heart } from 'ionicons/icons';
+
+function CurrentMoodDisplay({ mood }: { mood: string }) {
+  let moodText = mood ? mood.charAt(0).toUpperCase() + mood.slice(1) : "Unknown";
+  let color = "medium";
+  if (mood === "positive") color = "success";
+  else if (mood === "sad") color = "danger";
+  else if (mood === "angry") color = "warning";
+  else if (mood === "tired") color = "tertiary";
+  else if (mood === "anxious") color = "primary";
+  else if (mood === "neutral") color = "medium";
+  else if (!mood || mood === "" || mood === "unknown") color = "medium";
+  return (
+    <div style={{ marginTop: 16, marginBottom: 8 }}>
+      <span style={{ fontWeight: 500, fontSize: 14 }}>Current Mood:</span>
+      <IonChip color={color} style={{ fontSize: 14, marginLeft: 8 }}>
+        <IonIcon icon={heart} style={{ marginRight: 6 }} />
+        <IonLabel>{moodText}</IonLabel>
+      </IonChip>
+    </div>
+  );
+}
 import React, { useState, useEffect, useRef } from 'react';
 import {
   IonPage,
@@ -242,6 +264,7 @@ const SettingsPage: React.FC = () => {
               <div>
                 <h2>{profile.userName || 'Your Profile'}</h2>
                 <p>Relationship: {profile.relationshipLevel}</p>
+                <CurrentMoodDisplay mood={profile.currentMood} />
                 {profile.MBTI && <p>MBTI Type: <strong>{profile.MBTI}</strong></p>}
                 {/* Profile Goals Display */}
                 {goals.length > 0 && (
@@ -385,6 +408,9 @@ const SettingsPage: React.FC = () => {
           </IonCardContent>
         </IonCard>
 
+        {/* Mood History Previous Week Section */}
+        <MoodHistoryPreviousWeek />
+
         {/* Profile Modal */}
         <IonModal ref={modalRef} isOpen={editingProfile} onDidDismiss={closeModal} presentingElement={pageRef.current!}>
           <IonHeader>
@@ -516,5 +542,58 @@ const SettingsPage: React.FC = () => {
     </IonPage>
   );
 };
+
+// --- Mood History for Previous Week ---
+
+function MoodHistoryPreviousWeek() {
+  const [history, setHistory] = React.useState<{ date: string; mood: string }[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const stored = await Preferences.get({ key: "mood_history" });
+        if (stored.value) setHistory(JSON.parse(stored.value));
+      } catch {}
+      setLoading(false);
+    })();
+  }, []);
+
+  // Get previous week range
+  const now = new Date();
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setDate(now.getDate() - now.getDay()); // Sunday
+  const startOfPrevWeek = new Date(startOfThisWeek);
+  startOfPrevWeek.setDate(startOfThisWeek.getDate() - 7);
+  const endOfPrevWeek = new Date(startOfThisWeek);
+  endOfPrevWeek.setDate(startOfThisWeek.getDate() - 1); // Saturday
+
+  // Filter for previous week
+  const prevWeekEntries = history.filter(e => {
+    const entryDate = new Date(e.date);
+    return entryDate >= startOfPrevWeek && entryDate <= endOfPrevWeek;
+  }).sort((a, b) => a.date.localeCompare(b.date));
+
+  if (loading) return null;
+  return (
+    <div style={{ marginTop: 32, marginBottom: 24 }}>
+      <span style={{ fontWeight: 500, fontSize: 15 }}>Mood History (Previous Week):</span>
+      {prevWeekEntries.length === 0 ? (
+        <div style={{ marginTop: 8, color: '#888', fontSize: 13 }}>
+          No mood data for last week yet. Start chatting to track your emotions!
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          {prevWeekEntries.map((entry, idx) => (
+            <IonChip key={entry.date + idx} color="tertiary" style={{ fontSize: 12 }}>
+              {entry.date}: {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
+            </IonChip>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ...existing code...
 
 export default SettingsPage;
