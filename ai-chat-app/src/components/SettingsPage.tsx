@@ -1,15 +1,46 @@
 import { heart } from 'ionicons/icons';
 
+// --- Mood Color Mapping ---
+const ION_COLORS = ["primary", "secondary", "tertiary", "success", "warning", "danger"]; // Only vibrant IonChip colors
+const MOOD_COLOR_MAP: Record<string, string> = {
+  positive: "success",
+  happy: "success",
+  joyful: "success",
+  excited: "warning",
+  energetic: "warning",
+  sad: "danger",
+  angry: "warning",
+  tired: "tertiary",
+  anxious: "primary",
+  neutral: "medium",
+  relaxed: "secondary",
+  calm: "secondary",
+  peaceful: "secondary",
+  stressed: "danger",
+  lonely: "dark",
+  sick: "danger",
+  disgusted: "dark",
+  surprised: "tertiary",
+  confused: "medium",
+  grateful: "success",
+  hopeful: "success",
+  bored: "light",
+  unknown: "medium",
+};
+function getMoodColor(mood: string): string {
+  if (!mood || mood === "" || mood === "unknown") return "primary";
+  const key = mood.trim().toLowerCase();
+  if (MOOD_COLOR_MAP[key]) return MOOD_COLOR_MAP[key];
+  // Hash unknown mood to a vibrant color for consistency
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  const idx = Math.abs(hash) % ION_COLORS.length;
+  return ION_COLORS[idx];
+}
+
 function CurrentMoodDisplay({ mood }: { mood: string }) {
   let moodText = mood ? mood.charAt(0).toUpperCase() + mood.slice(1) : "Unknown";
-  let color = "medium";
-  if (mood === "positive") color = "success";
-  else if (mood === "sad") color = "danger";
-  else if (mood === "angry") color = "warning";
-  else if (mood === "tired") color = "tertiary";
-  else if (mood === "anxious") color = "primary";
-  else if (mood === "neutral") color = "medium";
-  else if (!mood || mood === "" || mood === "unknown") color = "medium";
+  let color = getMoodColor(mood);
   return (
     <div style={{ marginTop: 16, marginBottom: 8 }}>
       <span style={{ fontWeight: 500, fontSize: 14 }}>Current Mood:</span>
@@ -187,19 +218,6 @@ const SettingsPage: React.FC = () => {
     })();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      const [p, s, m] = await Promise.all([
-        Preferences.get({ key: 'user_profile' }),
-        Preferences.get({ key: 'chat_settings' }),
-        Preferences.get({ key: 'mbti' }),
-      ]);
-      if (p.value) setProfile(JSON.parse(p.value));
-      if (s.value) setSettings(JSON.parse(s.value));
-      if (m.value) setMbti(m.value);
-    })();
-  }, []);
-
   const updateMbti = async () => {
     const a = answers;
     const e = a['q1'] ?? 3;
@@ -249,6 +267,35 @@ const SettingsPage: React.FC = () => {
     await Preferences.set({ key: 'chat_settings', value: JSON.stringify(ns) });
   };
 
+  // --- Current Mood & History with Live Updates ---
+  function useLiveMood() {
+    const [currentMood, setCurrentMood] = useState('');
+    const [moodHistory, setMoodHistory] = useState([]);
+
+    const loadMood = async () => {
+      const profile = await Preferences.get({ key: 'user_profile' });
+      if (profile.value) {
+        const parsed = JSON.parse(profile.value);
+        setCurrentMood(parsed.currentMood || '');
+      }
+      const history = await Preferences.get({ key: 'mood_history' });
+      if (history.value) {
+        setMoodHistory(JSON.parse(history.value));
+      }
+    };
+
+    useEffect(() => {
+      loadMood();
+      const handler = () => loadMood();
+      window.addEventListener('mood-updated', handler);
+      return () => window.removeEventListener('mood-updated', handler);
+    }, []);
+
+    return { currentMood, moodHistory };
+  }
+
+  const { currentMood, moodHistory } = useLiveMood();
+
   return (
     <IonPage ref={pageRef}>
       <IonHeader>
@@ -264,7 +311,8 @@ const SettingsPage: React.FC = () => {
               <div>
                 <h2>{profile.userName || 'Your Profile'}</h2>
                 <p>Relationship: {profile.relationshipLevel}</p>
-                <CurrentMoodDisplay mood={profile.currentMood} />
+                <CurrentMoodDisplay mood={currentMood} />
+                <MoodHistoryDisplay history={moodHistory} />
                 {profile.MBTI && <p>MBTI Type: <strong>{profile.MBTI}</strong></p>}
                 {/* Profile Goals Display */}
                 {goals.length > 0 && (
@@ -398,6 +446,14 @@ const SettingsPage: React.FC = () => {
           </IonCardContent>
         </IonCard>
 
+        {/* Mood History Section - moved and styled */}
+        <IonCard style={{ margin: 20 }}>
+          <IonCardContent>
+            <MoodHistoryDisplay history={moodHistory} />
+            <MoodHistoryPreviousWeek history={moodHistory} />
+          </IonCardContent>
+        </IonCard>
+
         {/* About */}
         <IonCard style={{ margin: 20 }}>
           <IonCardContent style={{ textAlign: 'center' }}>
@@ -407,9 +463,6 @@ const SettingsPage: React.FC = () => {
             <p>Additional information can be found at companionconnect.online</p>
           </IonCardContent>
         </IonCard>
-
-        {/* Mood History Previous Week Section */}
-        <MoodHistoryPreviousWeek />
 
         {/* Profile Modal */}
         <IonModal ref={modalRef} isOpen={editingProfile} onDidDismiss={closeModal} presentingElement={pageRef.current!}>
@@ -545,19 +598,29 @@ const SettingsPage: React.FC = () => {
 
 // --- Mood History for Previous Week ---
 
-function MoodHistoryPreviousWeek() {
-  const [history, setHistory] = React.useState<{ date: string; mood: string }[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const stored = await Preferences.get({ key: "mood_history" });
-        if (stored.value) setHistory(JSON.parse(stored.value));
-      } catch {}
-      setLoading(false);
-    })();
-  }, []);
+function MoodHistoryDisplay({ history }: { history: { date: string; mood: string }[] }) {
+  if (!Array.isArray(history) || !history.length) return null;
+  // Sort by date descending, filter only last 7 days
+  const now = new Date();
+  const filtered = history.filter(e => {
+    const entryDate = new Date(e.date);
+    return (now.getTime() - entryDate.getTime()) < 8 * 24 * 60 * 60 * 1000;
+  }).sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <div style={{ marginTop: 16, marginBottom: 8 }}>
+      <span style={{ fontWeight: 500, fontSize: 14 }}>Mood History (Past Week):</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+        {filtered.map((entry, idx) => (
+          <IonChip key={entry.date + idx} color={getMoodColor(entry.mood)} style={{ fontSize: 12 }}>
+            {entry.date}: {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
+          </IonChip>
+        ))}
+      </div>
+    </div>
+  );
+}
 
+function MoodHistoryPreviousWeek({ history }: { history: { date: string; mood: string }[] }) {
   // Get previous week range
   const now = new Date();
   const startOfThisWeek = new Date(now);
@@ -568,12 +631,11 @@ function MoodHistoryPreviousWeek() {
   endOfPrevWeek.setDate(startOfThisWeek.getDate() - 1); // Saturday
 
   // Filter for previous week
-  const prevWeekEntries = history.filter(e => {
+  const prevWeekEntries = Array.isArray(history) ? history.filter(e => {
     const entryDate = new Date(e.date);
     return entryDate >= startOfPrevWeek && entryDate <= endOfPrevWeek;
-  }).sort((a, b) => a.date.localeCompare(b.date));
+  }).sort((a, b) => a.date.localeCompare(b.date)) : [];
 
-  if (loading) return null;
   return (
     <div style={{ marginTop: 32, marginBottom: 24 }}>
       <span style={{ fontWeight: 500, fontSize: 15 }}>Mood History (Previous Week):</span>
@@ -584,7 +646,7 @@ function MoodHistoryPreviousWeek() {
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
           {prevWeekEntries.map((entry, idx) => (
-            <IonChip key={entry.date + idx} color="tertiary" style={{ fontSize: 12 }}>
+            <IonChip key={entry.date + idx} color={getMoodColor(entry.mood)} style={{ fontSize: 12 }}>
               {entry.date}: {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
             </IonChip>
           ))}
@@ -593,7 +655,5 @@ function MoodHistoryPreviousWeek() {
     </div>
   );
 }
-
-// ...existing code...
 
 export default SettingsPage;
