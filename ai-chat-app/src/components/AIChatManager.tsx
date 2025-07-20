@@ -695,15 +695,15 @@ export const AIChatManager: React.FC = () => {
     // AI-based mood detection
     let detectedMood = "unknown";
     try {
-      const moodPrompt = `Based on the following user message, what is their mood? Reply with one word: positive, tired, anxious, sad, angry, neutral, or unknown.\nMessage: "${input}"`;
+      const moodPrompt = `Reply with one word only that best describes how the user feels.\n\nExamples:\n"I am happy" -> happy\n"I am sad" -> sad\n"I hate myself" -> sad\n"I'm so angry" -> angry\n"I'm exhausted" -> tired\n"I'm worried" -> anxious\n"I'm okay" -> neutral\n"I feel nothing" -> neutral\n"I don't know" -> unknown\n\nMessage: "${input}"`;
       const moodResponse = await callOpenAI(moodPrompt);
-      const mood = (moodResponse || "unknown").toLowerCase().trim();
-      const allowedMoods = ["positive", "tired", "anxious", "sad", "angry", "neutral", "unknown"];
-      detectedMood = allowedMoods.includes(mood) ? mood : "unknown";
+      detectedMood = (moodResponse || "unknown").toLowerCase().trim();
     } catch (err) {
       detectedMood = "unknown";
     }
     updates.currentMood = detectedMood;
+    // Notify other components of mood change
+    window.dispatchEvent(new Event('mood-updated'));
 
     // Update relationship level
     if (userProfile.conversationCount >= 20) {
