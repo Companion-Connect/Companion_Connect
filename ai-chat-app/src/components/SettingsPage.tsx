@@ -52,6 +52,10 @@ function CurrentMoodDisplay({ mood }: { mood: string }) {
   );
 }
 import React, { useState, useEffect, useRef } from 'react';
+// --- Web Crypto API SHA-256 Hash ---
+// Only one implementation needed, see above.
+
+// --- Main Component ---
 import {
   IonPage,
   IonHeader,
@@ -166,7 +170,22 @@ const defaultAppSettings: AppSettings = {
 
 const getPersonalityColor = (p: string) => ({ supportive: '#10b981', energetic: '#f59e0b', wise: '#8b5cf6' } as any)[p] || '#666';
 
+// --- Web Crypto API SHA-256 Hash ---
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const SettingsPage: React.FC = () => {
+
+  // --- Remove all login state and logic, keep only logout button ---
+  function handleLogout() {
+    // Optionally, trigger global logout if needed
+    window.location.reload(); // Or use a global context/logout handler
+  }
+
   const [profile, setProfile] = useState<UserProfile>(defaultUserProfile);
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -181,7 +200,6 @@ const SettingsPage: React.FC = () => {
       setGoals((storedGoals || []).filter((g: any) => !g.completed).map((g: any) => g.text));
     };
     loadGoals();
-    
     const handler = () => loadGoals();
     window.addEventListener('goals-updated', handler);
     return () => window.removeEventListener('goals-updated', handler);
@@ -296,11 +314,16 @@ const SettingsPage: React.FC = () => {
 
   const { currentMood, moodHistory } = useLiveMood();
 
+  // ...existing code...
+
   return (
     <IonPage ref={pageRef}>
       <IonHeader>
         <IonToolbar>
           <IonTitle>Settings</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={handleLogout}>Logout</IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
