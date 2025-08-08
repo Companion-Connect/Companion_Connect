@@ -83,36 +83,18 @@ const App: React.FC = () => {
     setLoading(true);
     const email = formatEmail(loginUsername);
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: loginPassword,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: loginPassword,
+    });
 
-      if (error) {
-        setLoginError("Invalid login credentials.");
-      } else if (data.user) {
-        // Update the profiles table with username and password
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({ 
-            id: data.user.id, 
-            username: loginUsername,
-            password: loginPassword 
-          });
-
-        if (profileError) {
-          console.error('Profile update error:', profileError);
-        }
-
-        setUser(data.user);
-        setShowLogin(false);
-        setLoginUsername("");
-        setLoginPassword("");
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      setLoginError("An error occurred during login.");
+    if (error || !data.user) {
+      setLoginError("Invalid credentials.");
+    } else {
+      await supabase
+        .from("profiles")
+        .upsert({ id: data.user.id, username: loginUsername, password: loginPassword });
+      setUser(data.user);
     }
 
     setLoading(false);
@@ -133,57 +115,19 @@ const App: React.FC = () => {
     setLoading(true);
     const email = formatEmail(loginUsername);
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: loginPassword,
-        options: { data: { username: loginUsername } },
-      });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: loginPassword,
+      options: { data: { username: loginUsername } },
+    });
 
-      if (error) {
-        if (error.message.includes("User already registered")) {
-          setLoginError("Username already exists.");
-        } else {
-          setLoginError(error.message);
-        }
-      } else if (data.user) {
-        // Insert into profiles table
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({ 
-            id: data.user.id, 
-            username: loginUsername,
-            password: loginPassword 
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Try upsert instead in case the trigger already created a profile
-          const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert({ 
-              id: data.user.id, 
-              username: loginUsername,
-              password: loginPassword 
-            });
-          
-          if (upsertError) {
-            console.error('Profile upsert error:', upsertError);
-          }
-        }
-
-        if (!data.session) {
-          setLoginError("Please check your email to confirm your account.");
-        } else {
-          setUser(data.user);
-          setShowLogin(false);
-          setLoginUsername("");
-          setLoginPassword("");
-        }
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      setLoginError("An error occurred during registration.");
+    if (error) {
+      setLoginError(error.message);
+    } else if (data.user) {
+      await supabase
+        .from("profiles")
+        .upsert({ id: data.user.id, username: loginUsername, password: loginPassword });
+      setUser(data.user);
     }
 
     setLoading(false);
@@ -215,42 +159,18 @@ const App: React.FC = () => {
               <h2>{registerMode ? "Create Account" : "Login"}</h2>
               <IonItem>
                 <IonLabel position="stacked">Username</IonLabel>
-                <IonInput 
-                  value={loginUsername} 
-                  onIonInput={e => setLoginUsername(e.detail.value!)}
-                  disabled={loading}
-                />
+                <IonInput value={loginUsername} onIonInput={(e) => setLoginUsername(e.detail.value!)} disabled={loading} />
               </IonItem>
               <IonItem>
                 <IonLabel position="stacked">Password</IonLabel>
-                <IonInput 
-                  type="password" 
-                  value={loginPassword} 
-                  onIonInput={e => setLoginPassword(e.detail.value!)}
-                  disabled={loading}
-                />
+                <IonInput type="password" value={loginPassword} onIonInput={(e) => setLoginPassword(e.detail.value!)} disabled={loading} />
               </IonItem>
-              {loginError && (
-                <IonText color="danger" style={{ display: 'block', marginTop: 8 }}>
-                  {loginError}
-                </IonText>
-              )}
-              <IonButton 
-                expand="block" 
-                style={{ marginTop: 16 }} 
-                onClick={registerMode ? handleRegister : handleLogin}
-                disabled={loading}
-              >
+              {loginError && <IonText color="danger">{loginError}</IonText>}
+              <IonButton expand="block" onClick={registerMode ? handleRegister : handleLogin} disabled={loading}>
                 {loading ? "Please wait..." : registerMode ? "Register" : "Login"}
               </IonButton>
-              <IonButton 
-                fill="clear" 
-                expand="block" 
-                style={{ marginTop: 8 }} 
-                onClick={() => setRegisterMode(!registerMode)}
-                disabled={loading}
-              >
-                {registerMode ? "Already have an account? Login" : "No account? Register"}
+              <IonButton fill="clear" expand="block" onClick={() => setRegisterMode(!registerMode)}>
+                {registerMode ? "Already have an account?" : "Create account"}
               </IonButton>
             </IonCardContent>
           </IonCard>

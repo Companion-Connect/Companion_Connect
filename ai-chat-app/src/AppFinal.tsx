@@ -1,41 +1,46 @@
-import React, { useState, useEffect } from "react";
+import { Redirect, Route } from "react-router-dom";
 import {
   IonApp,
+  IonIcon,
+  IonLabel,
+  IonRouterOutlet,
+  IonTabBar,
+  IonTabButton,
+  IonTabs,
   IonContent,
   IonCard,
   IonCardContent,
   IonItem,
   IonInput,
-  IonLabel,
   IonText,
   IonButton,
   IonLoading,
-  IonRouterOutlet,
-  IonTabs,
-  IonTabBar,
-  IonTabButton,
-  IonIcon,
-  IonReactRouter,
+  setupIonicReact,
 } from "@ionic/react";
-import { Redirect, Route } from "react-router-dom";
+import { IonReactRouter } from "@ionic/react-router";
 import { chatbubbles, heart, receiptSharp, settings } from "ionicons/icons";
-import { setupIonicReact } from "@ionic/react";
-
 import Tab1 from "./pages/Tab1";
 import Tab2 from "./pages/Tab2";
 import Tab3 from "./pages/Tab3";
 import Tab4 from "./pages/Tab4";
 import JournalManager from "./components/journalManager";
 import { supabase } from "./lib/supabase";
-import type { User } from "@supabase/supabase-js";
+import type { User, AuthError } from "@supabase/supabase-js";
 
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
 import "@ionic/react/css/structure.css";
 import "@ionic/react/css/typography.css";
 import "@ionic/react/css/padding.css";
+import "@ionic/react/css/float-elements.css";
+import "@ionic/react/css/text-alignment.css";
+import "@ionic/react/css/text-transformation.css";
 import "@ionic/react/css/flex-utils.css";
+import "@ionic/react/css/display.css";
+import "@ionic/react/css/palettes/dark.system.css";
 import "./theme/variables.css";
+
+import React, { useState, useEffect } from "react";
 
 setupIonicReact();
 
@@ -45,38 +50,52 @@ const App: React.FC = () => {
   const [registerMode, setRegisterMode] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [user, setUser] = useState<User | null>(null);
+  const [showLogin, setShowLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Session check error:', error);
+        } else if (session?.user) {
+          setUser(session.user);
+          setShowLogin(false);
+        }
+      } catch (error) {
+        console.error('Session check failed:', error);
+      } finally {
+        setInitializing(false);
       }
-      setInitializing(false);
     };
 
-    getSession();
+    checkSession();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event: string, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          setShowLogin(false);
+        } else {
+          setUser(null);
+          setShowLogin(true);
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const formatEmail = (username: string) =>
-    username.includes("@") ? username : `${username}@yourapp.com`;
+  const formatEmail = (username: string): string => {
+    return username.includes("@") ? username : `${username}@yourapp.com`;
+  };
 
   const handleLogin = async () => {
     setLoginError("");
     if (!loginUsername || !loginPassword) {
-      setLoginError("Username and password required.");
+      setLoginError("Please enter username and password.");
       return;
     }
 
@@ -90,15 +109,20 @@ const App: React.FC = () => {
       });
 
       if (error) {
-        setLoginError("Invalid login credentials.");
+        console.error('Login error:', error);
+        if (error.message.includes("Invalid login credentials")) {
+          setLoginError("Invalid username or password.");
+        } else {
+          setLoginError(error.message);
+        }
       } else if (data.user) {
-        // Update the profiles table with username and password
+        // Update the profiles table with username (but NOT password)
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({ 
             id: data.user.id, 
             username: loginUsername,
-            password: loginPassword 
+            updated_at: new Date().toISOString()
           });
 
         if (profileError) {
@@ -121,12 +145,12 @@ const App: React.FC = () => {
   const handleRegister = async () => {
     setLoginError("");
     if (!loginUsername || !loginPassword) {
-      setLoginError("Username and password required.");
+      setLoginError("Please enter username and password.");
       return;
     }
 
     if (loginPassword.length < 6) {
-      setLoginError("Password must be at least 6 characters.");
+      setLoginError("Password must be at least 6 characters long.");
       return;
     }
 
@@ -137,23 +161,29 @@ const App: React.FC = () => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: loginPassword,
-        options: { data: { username: loginUsername } },
+        options: { 
+          data: { 
+            username: loginUsername 
+          } 
+        },
       });
 
       if (error) {
+        console.error('Registration error:', error);
         if (error.message.includes("User already registered")) {
           setLoginError("Username already exists.");
         } else {
           setLoginError(error.message);
         }
       } else if (data.user) {
-        // Insert into profiles table
+        // Insert into profiles table (but NOT password)
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({ 
             id: data.user.id, 
             username: loginUsername,
-            password: loginPassword 
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
 
         if (profileError) {
@@ -164,7 +194,7 @@ const App: React.FC = () => {
             .upsert({ 
               id: data.user.id, 
               username: loginUsername,
-              password: loginPassword 
+              updated_at: new Date().toISOString()
             });
           
           if (upsertError) {
@@ -191,33 +221,47 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
-    setLoading(false);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error);
+      }
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setUser(null);
+      setShowLogin(true);
+      setLoginUsername("");
+      setLoginPassword("");
+      setLoginError("");
+      setLoading(false);
+    }
   };
 
   if (initializing) {
     return (
       <IonApp>
-        <IonContent fullscreen>
-          <IonLoading isOpen={true} message="Initializing..." />
+        <IonContent fullscreen style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <IonLoading isOpen={true} message="Loading..." />
         </IonContent>
       </IonApp>
     );
   }
 
-  if (!user) {
+  if (showLogin) {
     return (
       <IonApp>
-        <IonContent fullscreen className="ion-padding" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <IonCard style={{ width: "100%", maxWidth: 400 }}>
+        <IonContent fullscreen style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <IonCard style={{ maxWidth: 400, margin: "auto", padding: 24 }}>
             <IonCardContent>
-              <h2>{registerMode ? "Create Account" : "Login"}</h2>
+              <h2 style={{ textAlign: "center", marginBottom: 16 }}>
+                {registerMode ? "Create Account" : "Login"}
+              </h2>
               <IonItem>
                 <IonLabel position="stacked">Username</IonLabel>
                 <IonInput 
                   value={loginUsername} 
-                  onIonInput={e => setLoginUsername(e.detail.value!)}
+                  onIonInput={(e: any) => setLoginUsername(e.detail.value!)}
                   disabled={loading}
                 />
               </IonItem>
@@ -226,7 +270,7 @@ const App: React.FC = () => {
                 <IonInput 
                   type="password" 
                   value={loginPassword} 
-                  onIonInput={e => setLoginPassword(e.detail.value!)}
+                  onIonInput={(e: any) => setLoginPassword(e.detail.value!)}
                   disabled={loading}
                 />
               </IonItem>
@@ -264,24 +308,22 @@ const App: React.FC = () => {
       <IonReactRouter>
         <IonTabs>
           <IonRouterOutlet>
-            <Route exact path="/tab1">
-              <Tab1 user={user} onLogout={handleLogout} />
-            </Route>
-            <Route exact path="/tab2">
-              <Tab2 user={user} onLogout={handleLogout} />
-            </Route>
-            <Route exact path="/tab3">
-              <Tab3 user={user} onLogout={handleLogout} />
-            </Route>
-            <Route exact path="/journal">
-              <JournalManager user={user} onLogout={handleLogout} />
-            </Route>
-            <Route exact path="/">
-              <Redirect to="/tab1" />
-            </Route>
+            <Route exact path="/tab1"><Tab1 user={user} onLogout={handleLogout} /></Route>
+            <Route exact path="/tab2"><Tab2 user={user} onLogout={handleLogout} /></Route>
+            <Route exact path="/tab3"><Tab3 user={user} onLogout={handleLogout} /></Route>
+            <Route exact path="/journal"><JournalManager user={user} onLogout={handleLogout} /></Route>
+            <Route exact path="/"><Redirect to="/tab1" /></Route>
           </IonRouterOutlet>
-
-          <IonTabBar slot="bottom">
+          <IonTabBar
+            slot="bottom"
+            style={{
+              "--background": "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(20px)",
+              borderTop: "1px solid rgba(226, 232, 240, 0.8)",
+              "--color": "#64748b",
+              "--color-selected": "#667eea",
+            }}
+          >
             <IonTabButton tab="tab1" href="/tab1">
               <IonIcon icon={chatbubbles} />
               <IonLabel>Chat</IonLabel>
