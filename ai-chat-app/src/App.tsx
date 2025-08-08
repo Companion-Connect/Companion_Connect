@@ -15,8 +15,8 @@ import {
   IonTabBar,
   IonTabButton,
   IonIcon,
-  IonReactRouter,
 } from "@ionic/react";
+import { IonReactRouter } from "@ionic/react-router";
 import { Redirect, Route } from "react-router-dom";
 import { chatbubbles, heart, receiptSharp, settings } from "ionicons/icons";
 import { setupIonicReact } from "@ionic/react";
@@ -47,6 +47,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     const getSession = async () => {
@@ -274,7 +275,7 @@ const App: React.FC = () => {
               <Tab3 user={user} onLogout={handleLogout} />
             </Route>
             <Route exact path="/journal">
-              <JournalManager user={user} onLogout={handleLogout} />
+              <JournalManager />
             </Route>
             <Route exact path="/">
               <Redirect to="/tab1" />

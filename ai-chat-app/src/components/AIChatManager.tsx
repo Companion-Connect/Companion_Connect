@@ -202,10 +202,10 @@ export const AIChatManager: React.FC = () => {
       // Use ref to prevent duplicate welcome messages in strict mode
       if (!welcomeSentRef.current) {
         welcomeSentRef.current = true;
+        // Delay welcome message to ensure content is ready
         setTimeout(() => {
           sendWelcomeMessage();
-          
-        }, 500);
+        }, 1000);
       }
     };
 
@@ -300,6 +300,25 @@ export const AIChatManager: React.FC = () => {
     loadUserProfile();
   });
 
+  // Add effect to ensure content is ready
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (contentRef.current) {
+        // Force content to initialize by getting its client height
+        try {
+          const element = contentRef.current as any;
+          if (element.el) {
+            element.el.clientHeight;
+          }
+        } catch (error) {
+          console.warn('Content initialization warning:', error);
+        }
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   // Message handling
   const addMessage = (
     content: string,
@@ -333,10 +352,16 @@ export const AIChatManager: React.FC = () => {
       sendNotification(appSettings.aiName, content);
     }
 
-    // Scroll to bottom
+    // Scroll to bottom - delay to ensure content is rendered
     setTimeout(() => {
-      contentRef.current?.scrollToBottom(300);
-    }, 100);
+      if (contentRef.current) {
+        try {
+          contentRef.current.scrollToBottom(300);
+        } catch (error) {
+          console.warn('Scroll error:', error);
+        }
+      }
+    }, 500);
 
     return newMessage;
   };
@@ -435,8 +460,14 @@ export const AIChatManager: React.FC = () => {
     }
 
     setTimeout(() => {
-      contentRef.current?.scrollToBottom(300);
-    }, 100);
+      if (contentRef.current) {
+        try {
+          contentRef.current.scrollToBottom(300);
+        } catch (error) {
+          console.warn('Scroll error:', error);
+        }
+      }
+    }, 500);
   };
 
   // AI Response Generation
@@ -1071,6 +1102,7 @@ export const AIChatManager: React.FC = () => {
 
       <IonContent
         ref={contentRef}
+        scrollEvents={true}
         style={{
           "--background":
             "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #ddd6fe 100%)",

@@ -1,22 +1,14 @@
 import ChallengeGamification from '../components/ChallengeGamification';
 import React from 'react';
-import {
-  IonApp,
-  IonIcon,
-  IonLabel,
-  IonRouterOutlet,
-  IonTabBar,
-  IonTabButton,
-  IonTabs
-} from '@ionic/react';
-import { IonReactRouter } from '@ionic/react-router';
-import { chatbubblesOutline, settingsOutline } from 'ionicons/icons';
-import { Route, Redirect } from 'react-router-dom';
-
-
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
+import type { User } from '@supabase/supabase-js';
 
-const Tab2: React.FC = () => {
+interface Tab2Props {
+  user: User;
+  onLogout: () => void;
+}
+
+const Tab2: React.FC<Tab2Props> = ({ user, onLogout }) => {
   return (
     <IonPage>
       <IonHeader>
