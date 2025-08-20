@@ -54,6 +54,7 @@ const App: React.FC = () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (session?.user) {
         setUser(session.user);
       }
@@ -71,8 +72,9 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const formatEmail = (username: string) =>
-    username.includes("@") ? username : `${username}@yourapp.com`;
+  // const formatEmail = (username: string) =>
+  //   username.includes("@") ? username : `${username}@yourapp.com`;
+  //
 
   const handleLogin = async () => {
     setLoginError("");
@@ -81,8 +83,16 @@ const App: React.FC = () => {
       return;
     }
 
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(loginUsername)) {
+      setLoginError("Invalid email format.");
+      return;
+    } else {
+      setLoginError("");
+    }
+
     setLoading(true);
-    const email = formatEmail(loginUsername);
+    const email = loginUsername;
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -91,19 +101,18 @@ const App: React.FC = () => {
       });
 
       if (error) {
+        console.log(error);
         setLoginError("Invalid login credentials.");
       } else if (data.user) {
         // Update the profiles table with username and password
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({ 
-            id: data.user.id, 
-            username: loginUsername,
-            password: loginPassword 
-          });
+        const { error: profileError } = await supabase.from("profiles").upsert({
+          id: data.user.id,
+          username: loginUsername,
+          password: loginPassword,
+        });
 
         if (profileError) {
-          console.error('Profile update error:', profileError);
+          console.error("Profile update error:", profileError);
         }
 
         setUser(data.user);
@@ -112,7 +121,7 @@ const App: React.FC = () => {
         setLoginPassword("");
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       setLoginError("An error occurred during login.");
     }
 
@@ -131,8 +140,17 @@ const App: React.FC = () => {
       return;
     }
 
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(loginUsername)) {
+      setLoginError("Invalid email format.");
+      return;
+    } else {
+      setLoginError("");
+    }
+
     setLoading(true);
-    const email = formatEmail(loginUsername);
+
+    const email = loginUsername;
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -149,27 +167,25 @@ const App: React.FC = () => {
         }
       } else if (data.user) {
         // Insert into profiles table
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({ 
-            id: data.user.id, 
-            username: loginUsername,
-            password: loginPassword 
-          });
+        const { error: profileError } = await supabase.from("profiles").insert({
+          id: data.user.id,
+          username: loginUsername,
+          password: loginPassword,
+        });
 
         if (profileError) {
-          console.error('Profile creation error:', profileError);
+          console.error("Profile creation error:", profileError);
           // Try upsert instead in case the trigger already created a profile
           const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert({ 
-              id: data.user.id, 
+            .from("profiles")
+            .upsert({
+              id: data.user.id,
               username: loginUsername,
-              password: loginPassword 
+              password: loginPassword,
             });
-          
+
           if (upsertError) {
-            console.error('Profile upsert error:', upsertError);
+            console.error("Profile upsert error:", upsertError);
           }
         }
 
@@ -183,7 +199,7 @@ const App: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error("Registration error:", error);
       setLoginError("An error occurred during registration.");
     }
 
@@ -210,48 +226,65 @@ const App: React.FC = () => {
   if (!user) {
     return (
       <IonApp>
-        <IonContent fullscreen className="ion-padding" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <IonContent
+          fullscreen
+          className="ion-padding"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <IonCard style={{ width: "100%", maxWidth: 400 }}>
             <IonCardContent>
               <h2>{registerMode ? "Create Account" : "Login"}</h2>
               <IonItem>
                 <IonLabel position="stacked">Username</IonLabel>
-                <IonInput 
-                  value={loginUsername} 
-                  onIonInput={e => setLoginUsername(e.detail.value!)}
+                <IonInput
+                  value={loginUsername}
+                  onIonInput={(e) => setLoginUsername(e.detail.value!)}
                   disabled={loading}
                 />
               </IonItem>
               <IonItem>
                 <IonLabel position="stacked">Password</IonLabel>
-                <IonInput 
-                  type="password" 
-                  value={loginPassword} 
-                  onIonInput={e => setLoginPassword(e.detail.value!)}
+                <IonInput
+                  type="password"
+                  value={loginPassword}
+                  onIonInput={(e) => setLoginPassword(e.detail.value!)}
                   disabled={loading}
                 />
               </IonItem>
               {loginError && (
-                <IonText color="danger" style={{ display: 'block', marginTop: 8 }}>
+                <IonText
+                  color="danger"
+                  style={{ display: "block", marginTop: 8 }}
+                >
                   {loginError}
                 </IonText>
               )}
-              <IonButton 
-                expand="block" 
-                style={{ marginTop: 16 }} 
+              <IonButton
+                expand="block"
+                style={{ marginTop: 16 }}
                 onClick={registerMode ? handleRegister : handleLogin}
                 disabled={loading}
               >
-                {loading ? "Please wait..." : registerMode ? "Register" : "Login"}
+                {loading
+                  ? "Please wait..."
+                  : registerMode
+                    ? "Register"
+                    : "Login"}
               </IonButton>
-              <IonButton 
-                fill="clear" 
-                expand="block" 
-                style={{ marginTop: 8 }} 
+              <IonButton
+                fill="clear"
+                expand="block"
+                style={{ marginTop: 8 }}
                 onClick={() => setRegisterMode(!registerMode)}
                 disabled={loading}
               >
-                {registerMode ? "Already have an account? Login" : "No account? Register"}
+                {registerMode
+                  ? "Already have an account? Login"
+                  : "No account? Register"}
               </IonButton>
             </IonCardContent>
           </IonCard>
