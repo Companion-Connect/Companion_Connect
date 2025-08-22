@@ -8,7 +8,7 @@ interface Tab3Props {
 }
 
 const Tab3: React.FC<Tab3Props> = ({ user, onLogout }) => {
-  return <SettingsPage />;
+  return <SettingsPage user={user} onLogout={onLogout} />;
 };
 
 export default Tab3;

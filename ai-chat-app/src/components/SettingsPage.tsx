@@ -178,12 +178,20 @@ async function hashPassword(password: string): Promise<string> {
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-const SettingsPage: React.FC = () => {
+interface SettingsPageProps {
+  user?: any;
+  onLogout?: () => void;
+}
+
+const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
 
   // --- Remove all login state and logic, keep only logout button ---
   function handleLogout() {
-    // Optionally, trigger global logout if needed
-    window.location.reload(); // Or use a global context/logout handler
+    if (onLogout) {
+      onLogout();
+    } else {
+      window.location.reload(); // Fallback
+    }
   }
 
   const [profile, setProfile] = useState<UserProfile>(defaultUserProfile);

@@ -40,35 +40,66 @@ import "./theme/variables.css";
 setupIonicReact();
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerMode, setRegisterMode] = useState(false);
   const [loginError, setLoginError] = useState("");
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
-  const [showLogin, setShowLogin] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  console.log('App render - user:', !!user, 'checking:', checking, 'isLoggingOut:', isLoggingOut);
 
   useEffect(() => {
-    const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        // Get initial session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (mounted) {
+          setUser(session?.user ?? null);
+          setChecking(false);
+        }
+      } catch (error) {
+        console.error('Auth init error:', error);
+        if (mounted) {
+          setChecking(false);
+        }
       }
-      setInitializing(false);
     };
 
-    getSession();
+    // Fallback timeout
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        console.log('Auth timeout, proceeding...');
+        setChecking(false);
+      }
+    }, 3000);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    // Start auth check
+    initAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (mounted && !isLoggingOut) {
+        console.log('Auth event:', event, 'Has user:', !!session?.user);
+        setUser(session?.user ?? null);
+        setChecking(false);
+        clearTimeout(timeout); // Clear timeout when auth event fires
+      } else if (isLoggingOut) {
+        console.log('Ignoring auth event during logout:', event);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const formatEmail = (username: string) =>
@@ -92,28 +123,14 @@ const App: React.FC = () => {
 
       if (error) {
         setLoginError("Invalid login credentials.");
+        console.error('Login error:', error);
       } else if (data.user) {
-        // Update the profiles table with username and password
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({ 
-            id: data.user.id, 
-            username: loginUsername,
-            password: loginPassword 
-          });
-
-        if (profileError) {
-          console.error('Profile update error:', profileError);
-        }
-
-        setUser(data.user);
-        setShowLogin(false);
         setLoginUsername("");
         setLoginPassword("");
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoginError("An error occurred during login.");
+      setLoginError("Connection error. Please try again.");
     }
 
     setLoading(false);
@@ -149,35 +166,19 @@ const App: React.FC = () => {
         }
       } else if (data.user) {
         // Insert into profiles table
-        const { error: profileError } = await supabase
+        await supabase
           .from('profiles')
           .insert({ 
             id: data.user.id, 
             username: loginUsername,
-            password: loginPassword 
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
 
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Try upsert instead in case the trigger already created a profile
-          const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert({ 
-              id: data.user.id, 
-              username: loginUsername,
-              password: loginPassword 
-            });
-          
-          if (upsertError) {
-            console.error('Profile upsert error:', upsertError);
-          }
-        }
-
         if (!data.session) {
-          setLoginError("Please check your email to confirm your account.");
+          setLoginError("Registration successful! Please check your email to confirm your account, then try logging in.");
+          setRegisterMode(false);
         } else {
-          setUser(data.user);
-          setShowLogin(false);
           setLoginUsername("");
           setLoginPassword("");
         }
@@ -191,17 +192,37 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
+    
+    try {
+      // Clear user immediately
+      setUser(null);
+      
+      // Sign out
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      // Clear storage
+      localStorage.removeItem('sb-vhybrejllnjyoskvxcka-auth-token');
+      sessionStorage.clear();
+    } catch (error) {
+      console.error('Logout error:', error);
+      setUser(null);
+    }
+    
     setLoading(false);
+    
+    // Reset logout flag after a delay to allow auth events to settle
+    setTimeout(() => {
+      setIsLoggingOut(false);
+    }, 1000);
   };
 
-  if (initializing) {
+  if (checking) {
     return (
       <IonApp>
         <IonContent fullscreen>
-          <IonLoading isOpen={true} message="Initializing..." />
+          <IonLoading isOpen={true} message="Loading..." />
         </IonContent>
       </IonApp>
     );
