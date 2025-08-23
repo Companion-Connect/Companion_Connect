@@ -97,6 +97,8 @@ import {
 } from 'ionicons/icons';
 import { Preferences } from '@capacitor/preferences';
 import { StorageUtil } from '../utils/storage.utils';
+import { updateUserProfile, updateChatSettings, updateGoals } from '../utils/syncTrigger';
+import { SyncService } from '../services/syncService';
 import { trophyOutline, checkmarkCircle, checkmarkCircleOutline, flameOutline, flame } from 'ionicons/icons';
 const DISPLAY_BADGE_KEY = 'display_badge_id';
 interface Badge {
@@ -183,7 +185,7 @@ interface SettingsPageProps {
   onLogout?: () => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout }) => {
 
   // --- Remove all login state and logic, keep only logout button ---
   function handleLogout() {
@@ -194,13 +196,61 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
     }
   }
 
+
   const [profile, setProfile] = useState<UserProfile>(defaultUserProfile);
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [mbti, setMbti] = useState('');
 
+  // Load profile data on mount and when it changes
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const { value } = await Preferences.get({ key: 'user_profile' });
+        if (value) {
+          const loadedProfile = JSON.parse(value);
+          console.log('Loading profile in SettingsPage:', loadedProfile.userName);
+          setProfile({ ...defaultUserProfile, ...loadedProfile });
+          setMbti(loadedProfile.MBTI || '');
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    };
+
+    loadProfile();
+    
+    // Listen for profile updates from sync
+    const handleProfileUpdate = () => {
+      console.log('Profile update event received, reloading...');
+      loadProfile();
+    };
+    
+    window.addEventListener('profile-loaded', handleProfileUpdate);
+    window.addEventListener('storage', handleProfileUpdate);
+    
+    return () => {
+      window.removeEventListener('profile-loaded', handleProfileUpdate);
+      window.removeEventListener('storage', handleProfileUpdate);
+    };
+  }, []);
+
   const [editingProfile, setEditingProfile] = useState(false);
   const [tempProfile, setTempProfile] = useState<UserProfile>(defaultUserProfile);
+  const [usernameError, setUsernameError] = useState('');
+
+  // Listen for username conflicts
+  useEffect(() => {
+    const handleUsernameConflict = (event: CustomEvent) => {
+      const conflictUsername = event.detail.username;
+      setUsernameError(`Username "${conflictUsername}" is already taken. Please choose another.`);
+      setTimeout(() => setUsernameError(''), 5000); // Clear after 5 seconds
+    };
+
+    window.addEventListener('username-conflict', handleUsernameConflict as EventListener);
+    return () => window.removeEventListener('username-conflict', handleUsernameConflict as EventListener);
+  }, []);
+
   const [goals, setGoals] = useState<string[]>([]);
   useEffect(() => {
     const loadGoals = async () => {
@@ -222,7 +272,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
   }, []);
 
   const openProfileModal = () => {
-    setTempProfile(profile => ({ ...profile, goals: goals, interests: profileInterests }));
+    console.log('Opening profile modal - current profile:', profile);
+    console.log('Current goals:', goals);
+    console.log('Current interests:', profileInterests);
+    setTempProfile({ ...profile, goals: goals, interests: profileInterests });
     setEditingProfile(true);
   };
   const [newInterest, setNewInterest] = useState('');
@@ -266,14 +319,33 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
 
     const updated = { ...profile, MBTI: result };
     setProfile(updated);
-    await Preferences.set({ key: 'user_profile', value: JSON.stringify(updated) });
+    await updateUserProfile(updated);
   };
 
-  const openModal = () => { setTempProfile(profile); setEditingProfile(true); };
+  const openModal = () => { 
+    console.log('Opening profile modal with current profile:', profile);
+    setTempProfile({ ...profile, goals: goals, interests: profileInterests }); 
+    setEditingProfile(true); 
+  };
   const closeModal = () => setEditingProfile(false);
   const saveProfile = async () => {
-    setProfile(tempProfile);
-    await Preferences.set({ key: 'user_profile', value: JSON.stringify(tempProfile) });
+    console.log('Saving profile - tempProfile:', tempProfile);
+    console.log('Current profile before save:', profile);
+    
+    // Ensure we preserve critical fields that shouldn't be overwritten
+    const finalProfile = {
+      ...tempProfile,
+      // Preserve username if it exists in current profile but not in tempProfile
+      userName: tempProfile.userName || profile.userName,
+      // Preserve conversation count and relationship data
+      conversationCount: tempProfile.conversationCount || profile.conversationCount,
+      lastChatDate: tempProfile.lastChatDate || profile.lastChatDate,
+      relationshipLevel: tempProfile.relationshipLevel || profile.relationshipLevel
+    };
+    
+    console.log('Final profile being saved:', finalProfile);
+    setProfile(finalProfile);
+    await updateUserProfile(finalProfile);
     await Preferences.set({ key: 'profile_interests', value: JSON.stringify(tempProfile.interests || []) });
     setProfileInterests(tempProfile.interests || []);
     const storedGoals = await StorageUtil.get<any[]>('challenge_goals', []);
@@ -283,14 +355,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
       return existing ? existing : { id: Date.now().toString() + Math.random().toString(36).slice(2), text, completed: false };
     });
     const updatedGoals = [...newGoals, ...completedGoals];
-    await StorageUtil.set('challenge_goals', updatedGoals);
+    await updateGoals(updatedGoals);
     window.dispatchEvent(new Event('goals-updated'));
     setGoals(newGoals.map(g => g.text));
     setEditingProfile(false);
   };
   const saveSettings = async (ns: AppSettings) => {
     setSettings(ns);
-    await Preferences.set({ key: 'chat_settings', value: JSON.stringify(ns) });
+    await updateChatSettings(ns);
   };
 
   // --- Current Mood & History with Live Updates ---
@@ -512,9 +584,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
               <IonLabel position='stacked'>Name</IonLabel>
               <IonInput
                 value={tempProfile.userName}
-                onIonInput={e => setTempProfile({ ...tempProfile, userName: e.detail.value! })}
+                onIonInput={e => {
+                  setTempProfile({ ...tempProfile, userName: e.detail.value! });
+                  setUsernameError(''); // Clear error when user types
+                }}
               />
             </IonItem>
+            {usernameError && (
+              <IonText color="danger" style={{ display: 'block', marginTop: 8, marginLeft: 16 }}>
+                {usernameError}
+              </IonText>
+            )}
             <IonItem>
               <IonLabel position='stacked'>Age</IonLabel>
               <IonInput

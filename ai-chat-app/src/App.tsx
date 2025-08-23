@@ -28,6 +28,8 @@ import Tab4 from "./pages/Tab4";
 import JournalManager from "./components/journalManager";
 import { supabase } from "./lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import { SyncService } from "./services/syncService";
+import { useAutoSync } from "./hooks/useAutoSync";
 
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
@@ -42,14 +44,14 @@ setupIonicReact();
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerMode, setRegisterMode] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  console.log('App render - user:', !!user, 'checking:', checking, 'isLoggingOut:', isLoggingOut);
+  // Auto-sync hook - completely disable during logout
+  const { syncNow } = useAutoSync(isLoggingOut ? null : (user?.id || null));
 
   useEffect(() => {
     let mounted = true;
@@ -62,34 +64,31 @@ const App: React.FC = () => {
         
         if (mounted) {
           setUser(session?.user ?? null);
-          setChecking(false);
         }
       } catch (error) {
         console.error('Auth init error:', error);
-        if (mounted) {
-          setChecking(false);
-        }
+        // Continue anyway - don't block the app
       }
     };
 
-    // Fallback timeout
-    const timeout = setTimeout(() => {
-      if (mounted) {
-        console.log('Auth timeout, proceeding...');
-        setChecking(false);
-      }
-    }, 3000);
-
-    // Start auth check
+    // Start auth check - non-blocking
     initAuth();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (mounted && !isLoggingOut) {
-        console.log('Auth event:', event, 'Has user:', !!session?.user);
         setUser(session?.user ?? null);
-        setChecking(false);
-        clearTimeout(timeout); // Clear timeout when auth event fires
+
+        // Auto-sync on login
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('User signed in, loading data from Supabase...');
+          try {
+            await SyncService.loadFromSupabase(session.user.id);
+          } catch (error) {
+            console.warn('Failed to load data from Supabase:', error);
+            // Continue with login even if sync fails
+          }
+        }
       } else if (isLoggingOut) {
         console.log('Ignoring auth event during logout:', event);
       }
@@ -97,7 +96,6 @@ const App: React.FC = () => {
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -150,12 +148,14 @@ const App: React.FC = () => {
 
     setLoading(true);
     const email = formatEmail(loginUsername);
+    // Extract username from email if loginUsername contains @
+    const displayUsername = loginUsername.includes("@") ? loginUsername.split("@")[0] : loginUsername;
 
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: loginPassword,
-        options: { data: { username: loginUsername } },
+        options: { data: { username: displayUsername } },
       });
 
       if (error) {
@@ -170,7 +170,7 @@ const App: React.FC = () => {
           .from('profiles')
           .insert({ 
             id: data.user.id, 
-            username: loginUsername,
+            username: displayUsername,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
@@ -191,42 +191,12 @@ const App: React.FC = () => {
     setLoading(false);
   };
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    setLoading(true);
-    
-    try {
-      // Clear user immediately
-      setUser(null);
-      
-      // Sign out
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      // Clear storage
-      localStorage.removeItem('sb-vhybrejllnjyoskvxcka-auth-token');
-      sessionStorage.clear();
-    } catch (error) {
-      console.error('Logout error:', error);
-      setUser(null);
-    }
-    
-    setLoading(false);
-    
-    // Reset logout flag after a delay to allow auth events to settle
-    setTimeout(() => {
-      setIsLoggingOut(false);
-    }, 1000);
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
   };
-
-  if (checking) {
-    return (
-      <IonApp>
-        <IonContent fullscreen>
-          <IonLoading isOpen={true} message="Loading..." />
-        </IonContent>
-      </IonApp>
-    );
-  }
 
   if (!user) {
     return (

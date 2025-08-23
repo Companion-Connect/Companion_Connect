@@ -126,6 +126,8 @@ const ChallengeGamification: React.FC = () => {
   useEffect(() => {
     if (!loaded) return;
     StorageUtil.set(BADGES_KEY, badges);
+    // Trigger sync when badges change
+    window.dispatchEvent(new CustomEvent('badge-unlocked'));
   }, [badges, loaded]);
   useEffect(() => {
     if (!loaded) return;
