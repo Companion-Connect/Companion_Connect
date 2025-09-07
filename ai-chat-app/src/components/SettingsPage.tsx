@@ -178,24 +178,37 @@ async function hashPassword(password: string): Promise<string> {
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-const SettingsPage: React.FC = () => {
+import type { User } from '@supabase/supabase-js';
 
-  // --- Remove all login state and logic, keep only logout button ---
+interface SettingsPageProps {
+  onLogout?: () => void;
+  user?: User;
+}
+
+const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, user }) => {
+
+  // --- Logout uses provided handler when available ---
   function handleLogout() {
-    // Optionally, trigger global logout if needed
-    window.location.reload(); // Or use a global context/logout handler
+    if (onLogout) {
+      onLogout();
+    } else {
+      // fallback
+      window.location.reload();
+    }
   }
 
   const [profile, setProfile] = useState<UserProfile>(defaultUserProfile);
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [mbti, setMbti] = useState('');
+  const [theme, setTheme] = useState<'light'|'dark'>('light');
 
   const [editingProfile, setEditingProfile] = useState(false);
   const [tempProfile, setTempProfile] = useState<UserProfile>(defaultUserProfile);
   const [goals, setGoals] = useState<string[]>([]);
   useEffect(() => {
     const loadGoals = async () => {
+      if (!user) { setGoals([]); return; }
       const storedGoals = await StorageUtil.get<any[]>('challenge_goals', []);
       setGoals((storedGoals || []).filter((g: any) => !g.completed).map((g: any) => g.text));
     };
@@ -208,6 +221,7 @@ const SettingsPage: React.FC = () => {
   const [profileInterests, setProfileInterests] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
+      if (!user) { setProfileInterests([]); return; }
       const stored = await Preferences.get({ key: 'profile_interests' });
       if (stored.value) setProfileInterests(JSON.parse(stored.value));
     })();
@@ -231,8 +245,9 @@ const SettingsPage: React.FC = () => {
   const pageRef = useRef<HTMLElement>(null);
   useEffect(() => {
     (async () => {
-      const storedBadges = await StorageUtil.get<Badge[]>(BADGES_KEY, initialBadges);
-      setBadges(storedBadges || initialBadges);
+  if (!user) { setBadges([]); setDisplayBadgeId(null); return; }
+  const storedBadges = await StorageUtil.get<Badge[]>(BADGES_KEY, initialBadges);
+  setBadges(storedBadges || initialBadges);
     })();
   }, []);
 
@@ -291,28 +306,65 @@ const SettingsPage: React.FC = () => {
     const [moodHistory, setMoodHistory] = useState([]);
 
     const loadMood = async () => {
+      // Always load mood history from local Preferences so emotion display works when logged out
       const profile = await Preferences.get({ key: 'user_profile' });
       if (profile.value) {
         const parsed = JSON.parse(profile.value);
         setCurrentMood(parsed.currentMood || '');
+      } else {
+        setCurrentMood('');
       }
       const history = await Preferences.get({ key: 'mood_history' });
       if (history.value) {
         setMoodHistory(JSON.parse(history.value));
+      } else {
+        setMoodHistory([]);
       }
     };
 
     useEffect(() => {
+      let mounted = true;
       loadMood();
-      const handler = () => loadMood();
+      const handler = () => { if (mounted) loadMood(); };
       window.addEventListener('mood-updated', handler);
-      return () => window.removeEventListener('mood-updated', handler);
+      // polling fallback so updates from chat/journal sync quickly
+      const iv = setInterval(() => { if (mounted) loadMood(); }, 3000);
+      return () => { mounted = false; window.removeEventListener('mood-updated', handler); clearInterval(iv); };
     }, []);
 
     return { currentMood, moodHistory };
   }
 
   const { currentMood, moodHistory } = useLiveMood();
+
+  // --- Theme (light/dark) persistence and apply ---
+  useEffect(() => {
+    (async () => {
+      const stored = await Preferences.get({ key: 'theme' });
+      const t = (stored.value as 'light'|'dark') || 'light';
+      setTheme(t);
+      if (t === 'dark') {
+        document.body.classList.add('dark');
+        try { document.documentElement.classList.add('dark'); } catch {}
+      } else {
+        document.body.classList.remove('dark');
+        try { document.documentElement.classList.remove('dark'); } catch {}
+      }
+    })();
+  }, []);
+
+  const toggleTheme = async (isDark: boolean) => {
+    const t = isDark ? 'dark' : 'light';
+    setTheme(t as 'light'|'dark');
+    if (t === 'dark') {
+      document.body.classList.add('dark');
+      try { document.documentElement.classList.add('dark'); } catch {}
+    } else {
+      document.body.classList.remove('dark');
+      try { document.documentElement.classList.remove('dark'); } catch {}
+    }
+    await Preferences.set({ key: 'theme', value: t });
+  };
 
   // ...existing code...
 
@@ -375,50 +427,46 @@ const SettingsPage: React.FC = () => {
           </IonCardContent>
         </IonCard>
 
-        {/* MBTI Accordion */}
-        <IonAccordionGroup>
-          <IonAccordion value='mbti'>
-            <IonItem slot='header' lines='none' style={{ background: '#f0f0f0', padding: '12px 16px' }}>
-              <IonLabel style={{ fontWeight: 600, color: '#667eea' }}>Advanced MBTI Quiz</IonLabel>
-            </IonItem>
-            <div slot='content' style={{ padding: 16 }}>
-              <IonText style={{ fontSize: '0.9rem', color: '#555', marginBottom: '8px' }}>
-                1 = Strongly Disagree, 5 = Strongly Agree
-              </IonText>
-              <IonList>
-                {mbtiQuestions.map(q => (
-                  <React.Fragment key={q.id}>
-                    <IonListHeader>{q.text}</IonListHeader>
-                    <IonRadioGroup
-                      value={answers[q.id]?.toString()}
-                      onIonChange={e => setAnswers(a => ({ ...a, [q.id]: Number(e.detail.value) }))}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <IonItem key={n} lines='none' style={{ flex: 1, textAlign: 'center' }}>
-                            <IonText>{n}</IonText>
-                            <IonRadio slot='start' value={n.toString()} />
-                          </IonItem>
-                        ))}
-                      </div>
-                    </IonRadioGroup>
-                  </React.Fragment>
-                ))}
-              </IonList>
-              <IonButton expand='block' onClick={updateMbti} style={{ marginTop: 12, '--background': '#764ba2' }}>
-                Calculate MBTI
-              </IonButton>
-              {mbti && (
-                <IonCard style={{ marginTop: 12, background: 'linear-gradient(135deg,#764ba2,#667eea)', color: '#fff', textAlign: 'center' }}>
-                  <IonCardContent>
-                    <h1 style={{ fontSize: '2.5rem' }}>{mbti}</h1>
-                    <p>Your MBTI Type</p>
-                  </IonCardContent>
-                </IonCard>
-              )}
-            </div>
-          </IonAccordion>
-        </IonAccordionGroup>
+            {/* MBTI Quiz Card (styled like other sections) */}
+            <IonCard style={{ margin: 20 }}>
+              <IonCardContent>
+                <h3 style={{ marginBottom: 8, color: '#667eea' }}>Advanced MBTI Quiz</h3>
+                <IonText style={{ fontSize: '0.9rem', color: '#555', marginBottom: '8px', display: 'block' }}>
+                  1 = Strongly Disagree, 5 = Strongly Agree
+                </IonText>
+                <IonList>
+                  {mbtiQuestions.map(q => (
+                    <div key={q.id} style={{ marginBottom: 6 }}>
+                      <IonListHeader style={{ fontSize: 14 }}>{q.text}</IonListHeader>
+                      <IonRadioGroup
+                        value={answers[q.id]?.toString()}
+                        onIonChange={e => setAnswers(a => ({ ...a, [q.id]: Number(e.detail.value) }))}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <IonItem key={n} lines='none' style={{ flex: 1, textAlign: 'center' }}>
+                              <IonText>{n}</IonText>
+                              <IonRadio slot='start' value={n.toString()} />
+                            </IonItem>
+                          ))}
+                        </div>
+                      </IonRadioGroup>
+                    </div>
+                  ))}
+                </IonList>
+                <IonButton expand='block' onClick={updateMbti} style={{ marginTop: 12, '--background': '#764ba2' }}>
+                  Calculate MBTI
+                </IonButton>
+                {mbti && (
+                  <IonCard style={{ marginTop: 12, background: 'linear-gradient(135deg,#764ba2,#667eea)', color: '#fff', textAlign: 'center' }}>
+                    <IonCardContent>
+                      <h1 style={{ fontSize: '2.5rem' }}>{mbti}</h1>
+                      <p>Your MBTI Type</p>
+                    </IonCardContent>
+                  </IonCard>
+                )}
+              </IonCardContent>
+            </IonCard>
 
         {/* AI Personality */}
         <IonCard style={{ margin: 20 }}>
@@ -450,6 +498,11 @@ const SettingsPage: React.FC = () => {
           <IonCardContent>
             <h3>Preferences</h3>
             <IonList>
+              <IonItem lines='none'>
+                <IonIcon icon={colorPalette} style={{ marginRight: 12 }} />
+                <IonLabel>Dark Mode</IonLabel>
+                <IonToggle checked={theme === 'dark'} onIonChange={e => toggleTheme(e.detail.checked)} />
+              </IonItem>
               {[
                 { icon: chatbubbles, label: 'Emojis', prop: 'enableEmojis' },
                 { icon: brush, label: 'Typing Anim', prop: 'enableTypingAnimation' },
@@ -473,7 +526,6 @@ const SettingsPage: React.FC = () => {
         <IonCard style={{ margin: 20 }}>
           <IonCardContent>
             <MoodHistoryDisplay history={moodHistory} />
-            <MoodHistoryPreviousWeek history={moodHistory} />
           </IonCardContent>
         </IonCard>
 
@@ -629,13 +681,27 @@ function MoodHistoryDisplay({ history }: { history: { date: string; mood: string
     const entryDate = new Date(e.date);
     return (now.getTime() - entryDate.getTime()) < 8 * 24 * 60 * 60 * 1000;
   }).sort((a, b) => b.date.localeCompare(a.date));
+  const fmt = (iso?: string) => {
+    try {
+      const d = new Date(iso || '');
+      if (isNaN(d.getTime())) return iso || '';
+      const Y = d.getFullYear();
+      const M = String(d.getMonth() + 1).padStart(2, '0');
+      const D = String(d.getDate()).padStart(2, '0');
+      const H = String(d.getHours());
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${Y}-${M}-${D}, ${H}:${m}`;
+    } catch {
+      return iso || '';
+    }
+  };
   return (
     <div style={{ marginTop: 16, marginBottom: 8 }}>
       <span style={{ fontWeight: 500, fontSize: 14 }}>Mood History (Past Week):</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
         {filtered.map((entry, idx) => (
           <IonChip key={entry.date + idx} color={getMoodColor(entry.mood)} style={{ fontSize: 12 }}>
-            {entry.date}: {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
+            {fmt(entry.date)}: {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
           </IonChip>
         ))}
       </div>
@@ -668,11 +734,20 @@ function MoodHistoryPreviousWeek({ history }: { history: { date: string; mood: s
         </div>
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-          {prevWeekEntries.map((entry, idx) => (
-            <IonChip key={entry.date + idx} color={getMoodColor(entry.mood)} style={{ fontSize: 12 }}>
-              {entry.date}: {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
-            </IonChip>
-          ))}
+          {prevWeekEntries.map((entry, idx) => {
+            const d = new Date(entry.date);
+            const Y = d.getFullYear();
+            const M = String(d.getMonth() + 1).padStart(2, '0');
+            const D = String(d.getDate()).padStart(2, '0');
+            const H = String(d.getHours());
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const label = `${Y}-${M}-${D}, ${H}:${m}`;
+            return (
+              <IonChip key={entry.date + idx} color={getMoodColor(entry.mood)} style={{ fontSize: 12 }}>
+                {label}: {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
+              </IonChip>
+            );
+          })}
         </div>
       )}
     </div>

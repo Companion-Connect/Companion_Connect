@@ -1,3 +1,5 @@
+// confettiUtil is a JS module; allow implicit any here
+// @ts-ignore
 import { celebrateBadge } from './confettiUtil';
 import React, { useState, useEffect } from 'react';
 import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonInput, IonList, IonItem, IonLabel, IonCheckbox, IonGrid, IonRow, IonCol, IonIcon, IonBadge } from '@ionic/react';
@@ -57,7 +59,9 @@ const socialChallenges: SocialChallenge[] = [
   { id: '8', title: 'Volunteer Together', description: 'Find and participate in a volunteer activity with others', difficulty: 'hard' },
 ];
 
-const ChallengeGamification: React.FC = () => {
+import type { User } from '@supabase/supabase-js';
+
+const ChallengeGamification: React.FC<{ user?: User }> = ({ user }) => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [newGoal, setNewGoal] = useState('');
   const [streak, setStreak] = useState(0);
@@ -80,6 +84,10 @@ const ChallengeGamification: React.FC = () => {
 
   useEffect(() => {
     (async () => {
+      if (!user) {
+        setGoals([]); setStreak(0); setBadges(initialBadges); setLastCompleted(null); setWeeklyChallenge(null); setWeeklyCompleted(false); setLoaded(true);
+        return;
+      }
       const [storedGoals, storedStreak, storedBadges, storedLastCompleted, storedWeekly, storedWeeklyWeek, storedCompletedChallenges] = await Promise.all([
         StorageUtil.get<Goal[]>(GOALS_KEY, []),
         StorageUtil.get<number>(STREAK_KEY, 0),
@@ -113,28 +121,28 @@ const ChallengeGamification: React.FC = () => {
       }
       setLoaded(true);
     })();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !user) return;
     StorageUtil.set(GOALS_KEY, goals);
-  }, [goals, loaded]);
+  }, [goals, loaded, user]);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !user) return;
     StorageUtil.set(STREAK_KEY, streak);
-  }, [streak, loaded]);
+  }, [streak, loaded, user]);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !user) return;
     StorageUtil.set(BADGES_KEY, badges);
-  }, [badges, loaded]);
+  }, [badges, loaded, user]);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !user) return;
     if (lastCompleted) StorageUtil.set(LAST_COMPLETED_KEY, lastCompleted);
-  }, [lastCompleted, loaded]);
+  }, [lastCompleted, loaded, user]);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !user) return;
     StorageUtil.set(CHALLENGES_COMPLETED_KEY, completedChallenges);
-  }, [completedChallenges, loaded]);
+  }, [completedChallenges, loaded, user]);
 
   const handleAddGoal = () => {
     if (newGoal.trim() === '') return;

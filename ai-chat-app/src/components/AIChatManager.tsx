@@ -36,6 +36,7 @@ import {
   time,
 } from "ionicons/icons";
 import { Preferences } from "@capacitor/preferences";
+import { supabase } from '../lib/supabase';
 
 // Core CSS imports for Ionic components
 import "@ionic/react/css/core.css";
@@ -731,6 +732,24 @@ export const AIChatManager: React.FC = () => {
       detectedMood = (moodResponse || "unknown").toLowerCase().trim();
     } catch (err) {
       detectedMood = "unknown";
+    }
+    // Persist mood_history entry only if user is authenticated
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        try {
+          const mh = await Preferences.get({ key: 'mood_history' });
+          let history = mh.value ? JSON.parse(mh.value) : [];
+          history = history || [];
+          history.unshift({ date: new Date().toISOString(), mood: detectedMood });
+          if (history.length > 50) history = history.slice(0, 50);
+          await Preferences.set({ key: 'mood_history', value: JSON.stringify(history) });
+        } catch (e) {
+          console.warn('Failed to append chat mood to mood_history:', e);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to check session before appending chat mood:', err);
     }
     updates.currentMood = detectedMood;
     // Notify other components of mood change

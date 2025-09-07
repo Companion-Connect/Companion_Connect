@@ -17,6 +17,7 @@ import {
 } from "@ionic/react";
 import { send, mic, micOff, download } from "ionicons/icons";
 import { Preferences } from "@capacitor/preferences";
+import { supabase } from '../lib/supabase';
 import { EmojiPicker } from "./EmojiPicker";
 
 interface JournalMessage {
@@ -174,15 +175,23 @@ const JournalManager: React.FC = () => {
     };
     setMessages((prev) => [...prev, newMsg]);
     setTimeout(() => contentRef.current?.scrollToBottom(300), 100);
+    // Notify settings (and other listeners) that mood-related content may have changed
+    try {
+      window.dispatchEvent(new Event('mood-updated'));
+    } catch (e) {
+      // ignore
+    }
   };
 
   const sendMessage = async () => {
     if (!input.trim() || isTyping) return;
     setSessionEnded(false);
     const userText = input.trim();
-    setInput("");
-    addMessage(userText, true);
-    setIsTyping(true);
+  setInput("");
+  addMessage(userText, true);
+  // run mood detection and persist so Settings updates immediately
+  try { detectAndPersistMood(userText); } catch (e) { /* ignore */ }
+  setIsTyping(true);
 
     const updatedMessages = [
       ...messages,
@@ -198,6 +207,57 @@ const JournalManager: React.FC = () => {
     if (aiReply) addMessage(aiReply, false);
     else addMessage("Sorry, I had trouble responding. Please try again.", false);
     setIsTyping(false);
+  };
+
+  // Detect mood from user input and persist to Preferences (user_profile.currentMood and mood_history)
+  const detectAndPersistMood = async (text: string) => {
+    try {
+      const moodPrompt = `Reply with one word only that best describes how the user feels.\n\nExamples:\n"I am happy" -> happy\n"I am sad" -> sad\n"I hate myself" -> sad\n"I'm so angry" -> angry\n"I'm exhausted" -> tired\n"I'm worried" -> anxious\n"I'm okay" -> neutral\n"I feel nothing" -> neutral\n\nMessage: "${text}"`;
+  const moodResponse = await callOpenAI(moodPrompt);
+  // Normalize to a single-word mood (take first token, strip punctuation)
+  const raw = (moodResponse || "unknown").toString();
+  const first = (raw.split(/\s+/)[0] || "unknown").replace(/[^a-zA-Z-]/g, "");
+  const detectedMood = (first || "unknown").toLowerCase().trim();
+
+      // Only persist profile and mood history when user is authenticated
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          // Not logged in: do not persist
+          return;
+        }
+
+        // Update user_profile.currentMood
+        try {
+          const up = await Preferences.get({ key: 'user_profile' });
+          let profile = up.value ? JSON.parse(up.value) : {};
+          profile.currentMood = detectedMood;
+          await Preferences.set({ key: 'user_profile', value: JSON.stringify(profile) });
+        } catch (e) {
+          console.warn('Failed to update user_profile mood:', e);
+        }
+
+        // Append to mood_history
+        try {
+          const mh = await Preferences.get({ key: 'mood_history' });
+          let history = mh.value ? JSON.parse(mh.value) : [];
+          history = history || [];
+          history.unshift({ date: new Date().toISOString(), mood: detectedMood });
+          // keep last 50 entries
+          if (history.length > 50) history = history.slice(0, 50);
+          await Preferences.set({ key: 'mood_history', value: JSON.stringify(history) });
+        } catch (e) {
+          console.warn('Failed to update mood_history:', e);
+        }
+
+        // Notify listeners
+        try { window.dispatchEvent(new Event('mood-updated')); } catch {}
+      } catch (err) {
+        console.warn('Failed to check session before persisting mood:', err);
+      }
+    } catch (err) {
+      console.warn('Mood detection error:', err);
+    }
   };
 
   const callOpenAI = async (userMessage: string): Promise<string> => {

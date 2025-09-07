@@ -4,7 +4,7 @@ import '../styles/AIChatManager.css';
 import type { User } from '@supabase/supabase-js';
 
 interface Tab1Props {
-  user: User;
+  user?: User;
   onLogout: () => void;
 }
 

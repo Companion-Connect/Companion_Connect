@@ -4,7 +4,7 @@ import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/rea
 import type { User } from '@supabase/supabase-js';
 
 interface Tab2Props {
-  user: User;
+  user?: User;
   onLogout: () => void;
 }
 
@@ -17,7 +17,7 @@ const Tab2: React.FC<Tab2Props> = ({ user, onLogout }) => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
-        <ChallengeGamification />
+        <ChallengeGamification user={user} />
       </IonContent>
     </IonPage>
   );
