@@ -19,6 +19,7 @@ import { send, mic, micOff, download } from "ionicons/icons";
 import { Preferences } from "@capacitor/preferences";
 import { supabase } from '../lib/supabase';
 import { EmojiPicker } from "./EmojiPicker";
+import { StorageUtil } from '../utils/storage.utils';
 
 interface JournalMessage {
   id: string;
@@ -113,26 +114,20 @@ const JournalManager: React.FC = () => {
     }
   }, []);
 
-  // Load emoji setting from Preferences
+  // Load emoji setting from scoped chat_settings
   useEffect(() => {
-    Preferences.get({ key: "chat_settings" }).then((res) => {
-      if (res.value) {
-        try {
-          const settings = JSON.parse(res.value);
-          setEnableEmojis(!!settings.enableEmojis);
-        } catch {}
-      }
-    });
-    // Listen for changes to emoji setting (optional: polling)
-    const interval = setInterval(() => {
-      Preferences.get({ key: "chat_settings" }).then((res) => {
-        if (res.value) {
-          try {
-            const settings = JSON.parse(res.value);
-            setEnableEmojis(!!settings.enableEmojis);
-          } catch {}
-        }
-      });
+    (async () => {
+      try {
+        const settings = await StorageUtil.get<any>('chat_settings', null);
+        if (settings) setEnableEmojis(!!settings.enableEmojis);
+      } catch {}
+    })();
+    // Listen for changes to emoji setting (polling)
+    const interval = setInterval(async () => {
+      try {
+        const settings = await StorageUtil.get<any>('chat_settings', null);
+        if (settings) setEnableEmojis(!!settings.enableEmojis);
+      } catch {}
     }, 2000);
     return () => clearInterval(interval);
   }, []);
@@ -177,7 +172,8 @@ const JournalManager: React.FC = () => {
     setTimeout(() => contentRef.current?.scrollToBottom(300), 100);
     // Notify settings (and other listeners) that mood-related content may have changed
     try {
-      window.dispatchEvent(new Event('mood-updated'));
+      const ev = new CustomEvent('mood-updated', { detail: { reason: 'journal-add', time: new Date().toISOString() } });
+      window.dispatchEvent(ev as Event);
     } catch (e) {
       // ignore
     }
@@ -227,31 +223,30 @@ const JournalManager: React.FC = () => {
           return;
         }
 
-        // Update user_profile.currentMood
+        // Update user_profile.currentMood (scoped)
         try {
-          const up = await Preferences.get({ key: 'user_profile' });
-          let profile = up.value ? JSON.parse(up.value) : {};
+          const profile = await StorageUtil.get<any>('user_profile', {});
           profile.currentMood = detectedMood;
-          await Preferences.set({ key: 'user_profile', value: JSON.stringify(profile) });
+          await StorageUtil.set('user_profile', profile);
         } catch (e) {
           console.warn('Failed to update user_profile mood:', e);
         }
 
         // Append to mood_history
         try {
-          const mh = await Preferences.get({ key: 'mood_history' });
-          let history = mh.value ? JSON.parse(mh.value) : [];
-          history = history || [];
+          const history = (await StorageUtil.get<any[]>('mood_history', [])) || [];
           history.unshift({ date: new Date().toISOString(), mood: detectedMood });
-          // keep last 50 entries
-          if (history.length > 50) history = history.slice(0, 50);
-          await Preferences.set({ key: 'mood_history', value: JSON.stringify(history) });
+          if (history.length > 50) history.splice(50);
+          await StorageUtil.set('mood_history', history);
         } catch (e) {
           console.warn('Failed to update mood_history:', e);
         }
 
-        // Notify listeners
-        try { window.dispatchEvent(new Event('mood-updated')); } catch {}
+        // Notify listeners with mood detail
+        try {
+          const ev = new CustomEvent('mood-updated', { detail: { mood: detectedMood, time: new Date().toISOString(), source: 'journal' } });
+          window.dispatchEvent(ev as Event);
+        } catch {}
       } catch (err) {
         console.warn('Failed to check session before persisting mood:', err);
       }

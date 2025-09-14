@@ -8,32 +8,49 @@ export const StorageKeys = {
 } as const;
 
 export class StorageUtil {
-    static async get<T>(key: string, defaultValue?: T): Promise<T | null> {
+    // Optional current user id for scoping keys. Set when user logs in.
+    static currentUserId: string | null = null;
+
+    // Build a storage key scoped to a user when available, fallback to provided key
+    static scopedKey(key: string, forUser?: string | null) {
+        const uid = forUser ?? StorageUtil.currentUserId;
+        if (!uid) return key;
+        return `user_${uid}::${key}`;
+    }
+
+    // Convenience: set the current user id (or null to clear)
+    static setCurrentUserId(id: string | null) {
+        StorageUtil.currentUserId = id;
+    }
+    static async get<T>(key: string, defaultValue?: T, forUser?: string | null): Promise<T | null> {
+        const k = StorageUtil.scopedKey(key, forUser);
         try {
-            const { value } = await Preferences.get({ key });
+            const { value } = await Preferences.get({ key: k });
             return value ? JSON.parse(value) : defaultValue || null;
         } catch (error) {
-            console.error(`Error getting ${key} from storage:`, error);
+            console.error(`Error getting ${k} from storage:`, error);
             return defaultValue || null;
         }
     }
 
-    static async set<T>(key: string, value: T): Promise<void> {
+    static async set<T>(key: string, value: T, forUser?: string | null): Promise<void> {
+        const k = StorageUtil.scopedKey(key, forUser);
         try {
             await Preferences.set({
-                key,
+                key: k,
                 value: JSON.stringify(value)
             });
         } catch (error) {
-            console.error(`Error setting ${key} in storage:`, error);
+            console.error(`Error setting ${k} in storage:`, error);
         }
     }
 
-    static async remove(key: string): Promise<void> {
+    static async remove(key: string, forUser?: string | null): Promise<void> {
+        const k = StorageUtil.scopedKey(key, forUser);
         try {
-            await Preferences.remove({ key });
+            await Preferences.remove({ key: k });
         } catch (error) {
-            console.error(`Error removing ${key} from storage:`, error);
+            console.error(`Error removing ${k} from storage:`, error);
         }
     }
 
@@ -42,6 +59,19 @@ export class StorageUtil {
             await Preferences.clear();
         } catch (error) {
             console.error('Error clearing storage:', error);
+        }
+    }
+
+    // Migrate a key from anonymous (unscoped) into a user's scoped key and then remove the anonymous key
+    static async migrateToUser(key: string, userId: string) {
+        try {
+            const anon = await StorageUtil.get<any>(key, null, null);
+            if (anon !== null) {
+                await StorageUtil.set(key, anon, userId);
+                await StorageUtil.remove(key, null);
+            }
+        } catch (e) {
+            console.error('Migration error for', key, e);
         }
     }
 }

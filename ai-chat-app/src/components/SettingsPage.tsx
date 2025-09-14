@@ -216,16 +216,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, user }) => {
     const handler = () => loadGoals();
     window.addEventListener('goals-updated', handler);
     return () => window.removeEventListener('goals-updated', handler);
-  }, []);
+  }, [user]);
   
   const [profileInterests, setProfileInterests] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
-      if (!user) { setProfileInterests([]); return; }
-      const stored = await Preferences.get({ key: 'profile_interests' });
-      if (stored.value) setProfileInterests(JSON.parse(stored.value));
+  if (!user) { setProfileInterests([]); return; }
+  const stored = await StorageUtil.get<string[]>('profile_interests', []);
+  setProfileInterests(stored || []);
     })();
-  }, []);
+  }, [user]);
 
   const openProfileModal = () => {
     setTempProfile(profile => ({ ...profile, goals: goals, interests: profileInterests }));
@@ -237,19 +237,74 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, user }) => {
   const [displayBadgeId, setDisplayBadgeId] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
-      const storedId = await StorageUtil.get<string>(DISPLAY_BADGE_KEY);
-      setDisplayBadgeId(storedId || null);
+    const storedId = await StorageUtil.get<string>(DISPLAY_BADGE_KEY);
+    setDisplayBadgeId(storedId || null);
     })();
-  }, []);
+  }, [user]);
   const modalRef = useRef<HTMLIonModalElement>(null);
   const pageRef = useRef<HTMLElement>(null);
   useEffect(() => {
     (async () => {
-  if (!user) { setBadges([]); setDisplayBadgeId(null); return; }
-  const storedBadges = await StorageUtil.get<Badge[]>(BADGES_KEY, initialBadges);
-  setBadges(storedBadges || initialBadges);
+    if (!user) { setBadges([]); setDisplayBadgeId(null); return; }
+    const storedBadges = await StorageUtil.get<Badge[]>(BADGES_KEY, initialBadges);
+    setBadges(storedBadges || initialBadges);
     })();
-  }, []);
+  }, [user]);
+
+  // Load full profile and preferences when user changes
+  useEffect(() => {
+    (async () => {
+      if (!user) {
+        // Clear profile-related displays when logged out (UI only)
+        setProfile(defaultUserProfile);
+        setProfileInterests([]);
+        setGoals([]);
+        setBadges([]);
+        setDisplayBadgeId(null);
+        // Do NOT delete stored mood_history on logout; only clear UI state.
+        // Reset preferences to defaults when logged out (UI only)
+        setSettings(defaultAppSettings);
+        setTheme('light');
+        document.body.classList.remove('dark');
+        try { document.documentElement.classList.remove('dark'); } catch {}
+        return;
+      }
+
+      // Load profile
+      try {
+        const p = await StorageUtil.get<any>('user_profile', defaultUserProfile);
+        setProfile({ ...defaultUserProfile, ...p });
+      } catch (e) { console.warn('Failed to load profile', e); }
+
+      // Load interests
+      try {
+        const ints = await StorageUtil.get<string[]>('profile_interests', []);
+        setProfileInterests(ints || []);
+      } catch {}
+
+      // Load goals
+      try {
+        const storedGoals = await StorageUtil.get<any[]>('challenge_goals', []);
+        setGoals((storedGoals || []).filter((g: any) => !g.completed).map((g: any) => g.text));
+      } catch {}
+
+      // Load badges and display badge id
+      try {
+        const bs = await StorageUtil.get<Badge[]>(BADGES_KEY, initialBadges);
+        setBadges(bs || initialBadges);
+      } catch {}
+      try {
+        const disp = await StorageUtil.get<string>(DISPLAY_BADGE_KEY, undefined);
+        setDisplayBadgeId(disp || null);
+      } catch {}
+
+      // Load preferences (chat_settings) when logged in
+      try {
+        const prefs = await StorageUtil.get<AppSettings>('chat_settings', defaultAppSettings);
+        if (prefs) setSettings({ ...defaultAppSettings, ...prefs });
+      } catch (e) { console.warn('Failed to load chat_settings', e); }
+    })();
+  }, [user]);
 
   const updateMbti = async () => {
     const a = answers;
@@ -268,20 +323,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, user }) => {
     const typeJP = j >= p2 ? 'J' : 'P';
 
     const result = [typeEI, typeSN, typeTF, typeJP].join('');
-    setMbti(result);
-    await Preferences.set({ key: 'mbti', value: result });
+  setMbti(result);
+  await StorageUtil.set('mbti', result);
 
-    const updated = { ...profile, MBTI: result };
-    setProfile(updated);
-    await Preferences.set({ key: 'user_profile', value: JSON.stringify(updated) });
+  const updated = { ...profile, MBTI: result };
+  setProfile(updated);
+  await StorageUtil.set('user_profile', updated);
   };
 
   const openModal = () => { setTempProfile(profile); setEditingProfile(true); };
   const closeModal = () => setEditingProfile(false);
   const saveProfile = async () => {
-    setProfile(tempProfile);
-    await Preferences.set({ key: 'user_profile', value: JSON.stringify(tempProfile) });
-    await Preferences.set({ key: 'profile_interests', value: JSON.stringify(tempProfile.interests || []) });
+  setProfile(tempProfile);
+  await StorageUtil.set('user_profile', tempProfile);
+  await StorageUtil.set('profile_interests', tempProfile.interests || []);
     setProfileInterests(tempProfile.interests || []);
     const storedGoals = await StorageUtil.get<any[]>('challenge_goals', []);
     const completedGoals = (storedGoals || []).filter((g: any) => g.completed);
@@ -297,27 +352,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, user }) => {
   };
   const saveSettings = async (ns: AppSettings) => {
     setSettings(ns);
-    await Preferences.set({ key: 'chat_settings', value: JSON.stringify(ns) });
+  await StorageUtil.set('chat_settings', ns);
   };
 
   // --- Current Mood & History with Live Updates ---
-  function useLiveMood() {
+  function useLiveMood(user?: any) {
     const [currentMood, setCurrentMood] = useState('');
-    const [moodHistory, setMoodHistory] = useState([]);
+    const [moodHistory, setMoodHistory] = useState<any[]>([]);
 
     const loadMood = async () => {
-      // Always load mood history from local Preferences so emotion display works when logged out
-      const profile = await Preferences.get({ key: 'user_profile' });
-      if (profile.value) {
-        const parsed = JSON.parse(profile.value);
-        setCurrentMood(parsed.currentMood || '');
-      } else {
-        setCurrentMood('');
+      if (!user) {
+        // When logged out, show cleared state per requirement
+        setCurrentMood('unknown');
+        setMoodHistory([]);
+        return;
       }
-      const history = await Preferences.get({ key: 'mood_history' });
-      if (history.value) {
-        setMoodHistory(JSON.parse(history.value));
-      } else {
+      try {
+        const profile = await StorageUtil.get<any>('user_profile', {});
+        setCurrentMood((profile && profile.currentMood) || 'unknown');
+      } catch {
+        setCurrentMood('unknown');
+      }
+      try {
+        const history = (await StorageUtil.get<any[]>('mood_history', [])) || [];
+        setMoodHistory(history);
+      } catch {
         setMoodHistory([]);
       }
     };
@@ -325,23 +384,34 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, user }) => {
     useEffect(() => {
       let mounted = true;
       loadMood();
-      const handler = () => { if (mounted) loadMood(); };
+      const handler = (e?: any) => { if (mounted) {
+        // If the event carries detail about a mood, and we're logged out, show transient mood
+        try {
+          const detail = e?.detail || undefined;
+          if (!user && detail && detail.mood) {
+            setCurrentMood(detail.mood || 'unknown');
+            setMoodHistory(prev => [{ date: detail.time || new Date().toISOString(), mood: detail.mood }, ...prev].slice(0, 20));
+            return;
+          }
+        } catch {}
+        loadMood();
+      } };
       window.addEventListener('mood-updated', handler);
       // polling fallback so updates from chat/journal sync quickly
       const iv = setInterval(() => { if (mounted) loadMood(); }, 3000);
       return () => { mounted = false; window.removeEventListener('mood-updated', handler); clearInterval(iv); };
-    }, []);
+    }, [user]);
 
     return { currentMood, moodHistory };
   }
 
-  const { currentMood, moodHistory } = useLiveMood();
+  const { currentMood, moodHistory } = useLiveMood(user);
 
   // --- Theme (light/dark) persistence and apply ---
   useEffect(() => {
     (async () => {
-      const stored = await Preferences.get({ key: 'theme' });
-      const t = (stored.value as 'light'|'dark') || 'light';
+      const stored = await StorageUtil.get<'light'|'dark'>('theme', 'light');
+      const t = stored || 'light';
       setTheme(t);
       if (t === 'dark') {
         document.body.classList.add('dark');
@@ -363,7 +433,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout, user }) => {
       document.body.classList.remove('dark');
       try { document.documentElement.classList.remove('dark'); } catch {}
     }
-    await Preferences.set({ key: 'theme', value: t });
+  await StorageUtil.set('theme', t);
   };
 
   // ...existing code...

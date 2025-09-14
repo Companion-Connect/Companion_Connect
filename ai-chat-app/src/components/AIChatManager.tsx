@@ -37,6 +37,7 @@ import {
 } from "ionicons/icons";
 import { Preferences } from "@capacitor/preferences";
 import { supabase } from '../lib/supabase';
+import { StorageUtil } from '../utils/storage.utils';
 
 // Core CSS imports for Ionic components
 import "@ionic/react/css/core.css";
@@ -213,6 +214,9 @@ export const AIChatManager: React.FC = () => {
     initialize();
     initializeSpeechRecognition();
     requestNotificationPermission();
+  const authHandler = () => { loadAppSettings(); loadUserProfile(); };
+  window.addEventListener('auth-changed', authHandler);
+
   }, []);
 
   // Initialize Speech Recognition
@@ -274,9 +278,8 @@ export const AIChatManager: React.FC = () => {
   // Storage functions
   const loadAppSettings = async () => {
     try {
-      const { value } = await Preferences.get({ key: "chat_settings" });
-      if (value) {
-        const savedSettings = JSON.parse(value);
+      const savedSettings = await StorageUtil.get<any>('chat_settings', null);
+      if (savedSettings) {
         setAppSettings({ ...defaultAppSettings, ...savedSettings });
       }
     } catch (error) {
@@ -286,11 +289,8 @@ export const AIChatManager: React.FC = () => {
 
   const loadUserProfile = async () => {
     try {
-      const { value } = await Preferences.get({ key: "user_profile" });
-      if (value) {
-        const profile = JSON.parse(value);
-        setUserProfile({ ...defaultUserProfile, ...profile });
-      }
+  const profile = await StorageUtil.get<any>('user_profile', {});
+  if (profile) setUserProfile({ ...defaultUserProfile, ...profile });
     } catch (error) {
       console.error("Error loading user profile:", error);
     }
@@ -738,12 +738,10 @@ export const AIChatManager: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         try {
-          const mh = await Preferences.get({ key: 'mood_history' });
-          let history = mh.value ? JSON.parse(mh.value) : [];
-          history = history || [];
+          const history = (await StorageUtil.get<any[]>('mood_history', [])) || [];
           history.unshift({ date: new Date().toISOString(), mood: detectedMood });
-          if (history.length > 50) history = history.slice(0, 50);
-          await Preferences.set({ key: 'mood_history', value: JSON.stringify(history) });
+          if (history.length > 50) history.splice(50);
+          await StorageUtil.set('mood_history', history);
         } catch (e) {
           console.warn('Failed to append chat mood to mood_history:', e);
         }
@@ -753,7 +751,11 @@ export const AIChatManager: React.FC = () => {
     }
     updates.currentMood = detectedMood;
     // Notify other components of mood change
-    window.dispatchEvent(new Event('mood-updated'));
+    // Notify other components of mood change with detail
+    try {
+      const ev = new CustomEvent('mood-updated', { detail: { mood: detectedMood, time: new Date().toISOString(), source: 'chat' } });
+      window.dispatchEvent(ev as Event);
+    } catch {}
 
     // Update relationship level
     if (userProfile.conversationCount >= 20) {
@@ -768,10 +770,7 @@ export const AIChatManager: React.FC = () => {
 
   const saveUserProfile = async (profile: UserProfile) => {
     try {
-      await Preferences.set({
-        key: "user_profile",
-        value: JSON.stringify(profile),
-      });
+    await StorageUtil.set('user_profile', profile);
       setUserProfile(profile);
     } catch (error) {
       console.error("Error saving user profile:", error);

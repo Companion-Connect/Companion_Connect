@@ -31,6 +31,7 @@ import Tab3 from "./pages/Tab3";
 import Tab4 from "./pages/Tab4";
 import JournalManager from "./components/journalManager";
 import { supabase } from "./lib/supabase";
+import { StorageUtil } from './utils/storage.utils';
 // ...existing imports...
 import type { User } from "@supabase/supabase-js";
 
@@ -56,11 +57,22 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) setUser(session.user);
-      setInitializing(false);
+      try {
+        // Wait for session but don't hang forever - timeout after 8s
+        const p = supabase.auth.getSession();
+        const res: any = await Promise.race([
+          p,
+          new Promise((_, rej) => setTimeout(() => rej(new Error('session_timeout')), 8000)),
+        ]);
+        const session = res?.data?.session;
+        if (session?.user) setUser(session.user);
+        StorageUtil.setCurrentUserId(session?.user?.id ?? null);
+      } catch (e) {
+        console.warn('Failed to get session during init or timed out:', e);
+        StorageUtil.setCurrentUserId(null);
+      } finally {
+        setInitializing(false);
+      }
     };
     getSession();
 
@@ -68,6 +80,9 @@ const App: React.FC = () => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      const uid = session?.user?.id ?? null;
+      StorageUtil.setCurrentUserId(uid);
+      try { window.dispatchEvent(new CustomEvent('auth-changed', { detail: { userId: uid } }) as Event); } catch {}
     });
 
     return () => subscription.unsubscribe();
@@ -152,6 +167,27 @@ const App: React.FC = () => {
         // If we received a session, we're logged in
         if (data.session && data.user) {
           setUser(data.user);
+          // ensure StorageUtil uses the new user's id
+          const newUserId = data.user?.id ?? null;
+          StorageUtil.setCurrentUserId(newUserId);
+          // migrate anonymous data into user-scoped keys (only if we have an id)
+          if (newUserId) {
+            (async () => {
+              try {
+                // Migrate common anonymous keys into the new user-scoped keys
+                await StorageUtil.migrateToUser('mood_history', newUserId);
+                await StorageUtil.migrateToUser('challenge_goals', newUserId);
+                await StorageUtil.migrateToUser('challenge_badges', newUserId);
+                await StorageUtil.migrateToUser('user_profile', newUserId);
+                await StorageUtil.migrateToUser('profile_interests', newUserId);
+                await StorageUtil.migrateToUser('display_badge_id', newUserId);
+                await StorageUtil.migrateToUser('chat_settings', newUserId);
+              } catch (e) {
+                console.warn('Data migration after registration failed:', e);
+              }
+            })();
+          }
+
           setShowLogin(false);
           setLoginUsername("");
           setLoginPassword("");
