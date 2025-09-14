@@ -304,7 +304,7 @@ const App: React.FC = () => {
                 >
                   {registerMode ? 'Already have an account? Login' : 'No account? Register'}
                 </IonButton>
-                <div style={{ marginTop: 8, textAlign: 'center' }}>
+                <div style={{ marginTop: 8, textAlign: 'center' }}  >
                   <IonButton fill="clear" onClick={() => setShowLogin(false)}>Close</IonButton>
                 </div>
               </IonCardContent>
