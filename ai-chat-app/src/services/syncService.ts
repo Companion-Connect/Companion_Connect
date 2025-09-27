@@ -8,7 +8,7 @@ export interface UserProfile {
   userPrefTime: string;
   MBTI: string;
   interests: string[];
-  goals: string[];
+  goals: Array<{ id: string; text: string; completed: boolean }>;
   challenges: string[];
   currentMood: string;
   communicationStyle: string;
@@ -47,6 +47,8 @@ export class SyncService {
       const profile: UserProfile = JSON.parse(value);
       const { value: interestsStr } = await Preferences.get({ key: 'profile_interests' });
       const interests = interestsStr ? JSON.parse(interestsStr) : profile.interests;
+      const { value: goalsStr } = await Preferences.get({ key: 'challenge_goals' });
+      const goals = goalsStr ? JSON.parse(goalsStr) : profile.goals;
 
       await supabase
         .from('profiles')
@@ -58,7 +60,7 @@ export class SyncService {
           pref_time: profile.userPrefTime,
           mbti: profile.MBTI,
           interests,
-          goals: profile.goals,
+          goals: goals,
           challenges: profile.challenges,
           current_mood: profile.currentMood,
           communication_style: profile.communicationStyle,
@@ -147,35 +149,7 @@ export class SyncService {
     }
   }
 
-  /**
-   * Sync goals to Supabase
-   */
-  static async syncGoals(userId: string): Promise<void> {
-    try {
-      const { value } = await Preferences.get({ key: 'challenge_goals' });
-      if (!value) return;
-
-      const goals: Array<{ id: string; text: string; completed: boolean }> = JSON.parse(value);
-
-      // Clear existing goals and insert current ones
-      await supabase.from('user_goals').delete().eq('user_id', userId);
-
-      const goalInserts = goals.map(goal => ({
-        user_id: userId,
-        goal_id: goal.id,
-        text: goal.text,
-        completed: goal.completed,
-        completed_at: goal.completed ? new Date().toISOString() : null
-      }));
-
-      if (goalInserts.length > 0) {
-        await supabase.from('user_goals').insert(goalInserts);
-        console.log(`Synced ${goals.length} goals`);
-      }
-    } catch (error) {
-      console.error('Error syncing goals:', error);
-    }
-  }
+  
 
   /**
    * Sync badges to Supabase
@@ -281,8 +255,7 @@ export class SyncService {
     const loadOperations = [
       this.loadProfileData(userId).catch(e => console.error('Profile load error:', e)),
       this.loadChatSettings(userId).catch(e => console.error('Settings load error:', e)),
-      this.loadBadgesData(userId).catch(e => console.error('Badges load error:', e)),
-      this.loadGoalsData(userId).catch(e => console.error('Goals load error:', e))
+      this.loadBadgesData(userId).catch(e => console.error('Badges load error:', e))
     ];
 
     try {
@@ -332,6 +305,14 @@ export class SyncService {
             value: JSON.stringify(profile.interests)
           });
           console.log('Saved interests to local storage:', profile.interests);
+        }
+
+        if (profile.goals) {
+          await Preferences.set({
+            key: 'challenge_goals',
+            value: JSON.stringify(profile.goals)
+          });
+          console.log('Saved goals to local storage:', profile.goals);
         }
         
         console.log('Profile successfully saved to local storage');
@@ -411,34 +392,7 @@ export class SyncService {
     }
   }
 
-  private static async loadGoalsData(userId: string): Promise<void> {
-    try {
-      const { data: goals } = await supabase
-        .from('user_goals')
-        .select('*')
-        .eq('user_id', userId);
-
-      if (goals && goals.length > 0) {
-        const goalData = goals.map(goal => ({
-          id: goal.goal_id,
-          text: goal.text,
-          completed: goal.completed
-        }));
-
-        await Preferences.set({
-          key: 'challenge_goals',
-          value: JSON.stringify(goalData)
-        });
-
-        // Trigger events so components refresh
-        window.dispatchEvent(new CustomEvent('goals-loaded'));
-        window.dispatchEvent(new CustomEvent('storage'));
-        console.log('Goals loaded from Supabase:', goalData.length);
-      }
-    } catch (error) {
-      console.log('No goals found, using defaults');
-    }
-  }
+  
 
   private static async loadBadgesData(userId: string): Promise<void> {
     try {
