@@ -3,7 +3,7 @@
   "integrations": {
     "capacitor": {}
   },
-  "type": "react-vite",
+  "type": "react",
   "proxies": [
     {
       "path": "/api",
