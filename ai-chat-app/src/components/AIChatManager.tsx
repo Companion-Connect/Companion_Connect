@@ -569,7 +569,7 @@ export const AIChatManager: React.FC = () => {
   // OpenAI Integration with personality applied
   const callOpenAI = async (userMessage: string): Promise<string> => {
     //AI key should be set in environment variables or secure storage
-    const OPENAI_API_KEY = ;
+    const OPENAI_API_KEY;
 
     console.log("Calling OpenAI API...");
 
