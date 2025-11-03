@@ -17,7 +17,6 @@ import {
 } from "@ionic/react";
 import { send, mic, micOff, download } from "ionicons/icons";
 import { Preferences } from "@capacitor/preferences";
-import { supabase } from '../lib/supabase';
 import { EmojiPicker } from "./EmojiPicker";
 import { StorageUtil } from '../utils/storage.utils';
 
@@ -215,14 +214,8 @@ const JournalManager: React.FC = () => {
   const first = (raw.split(/\s+/)[0] || "unknown").replace(/[^a-zA-Z-]/g, "");
   const detectedMood = (first || "unknown").toLowerCase().trim();
 
-      // Only persist profile and mood history when user is authenticated
+      // Persist profile and mood history
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
-          // Not logged in: do not persist
-          return;
-        }
-
         // Update user_profile.currentMood (scoped)
         try {
           const profile = await StorageUtil.get<any>('user_profile', {});

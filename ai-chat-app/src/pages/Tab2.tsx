@@ -1,14 +1,8 @@
 import ChallengeGamification from '../components/ChallengeGamification';
 import React from 'react';
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
-import type { User } from '@supabase/supabase-js';
 
-interface Tab2Props {
-  user?: User;
-  onLogout: () => void;
-}
-
-const Tab2: React.FC<Tab2Props> = ({ user, onLogout }) => {
+const Tab2: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
@@ -17,7 +11,7 @@ const Tab2: React.FC<Tab2Props> = ({ user, onLogout }) => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
-        <ChallengeGamification user={user} />
+        <ChallengeGamification />
       </IonContent>
     </IonPage>
   );

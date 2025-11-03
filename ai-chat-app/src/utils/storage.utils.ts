@@ -25,7 +25,17 @@ export class StorageUtil {
     static async get<T>(key: string, defaultValue?: T, forUser?: string | null): Promise<T | null> {
         const k = StorageUtil.scopedKey(key, forUser);
         try {
-            const { value } = await Preferences.get({ key: k });
+            // Try Capacitor Preferences first, fallback to localStorage
+            let value: string | null = null;
+            try {
+                const result = await Preferences.get({ key: k });
+                value = result.value;
+            } catch (capacitorError) {
+                console.warn('Capacitor Preferences failed, using localStorage:', capacitorError);
+                value = localStorage.getItem(k);
+            }
+            
+            console.log(`Getting ${k} from storage:`, value);
             return value ? JSON.parse(value) : defaultValue || null;
         } catch (error) {
             console.error(`Error getting ${k} from storage:`, error);
@@ -36,10 +46,21 @@ export class StorageUtil {
     static async set<T>(key: string, value: T, forUser?: string | null): Promise<void> {
         const k = StorageUtil.scopedKey(key, forUser);
         try {
-            await Preferences.set({
-                key: k,
-                value: JSON.stringify(value)
-            });
+            const jsonValue = JSON.stringify(value);
+            console.log(`Setting ${k} in storage:`, jsonValue);
+            
+            // Try Capacitor Preferences first, fallback to localStorage
+            try {
+                await Preferences.set({
+                    key: k,
+                    value: jsonValue
+                });
+                console.log(`Successfully saved ${k} with Capacitor Preferences`);
+            } catch (capacitorError) {
+                console.warn('Capacitor Preferences failed, using localStorage:', capacitorError);
+                localStorage.setItem(k, jsonValue);
+                console.log(`Successfully saved ${k} with localStorage`);
+            }
         } catch (error) {
             console.error(`Error setting ${k} in storage:`, error);
         }
@@ -48,7 +69,13 @@ export class StorageUtil {
     static async remove(key: string, forUser?: string | null): Promise<void> {
         const k = StorageUtil.scopedKey(key, forUser);
         try {
-            await Preferences.remove({ key: k });
+            // Try Capacitor Preferences first, fallback to localStorage
+            try {
+                await Preferences.remove({ key: k });
+            } catch (capacitorError) {
+                console.warn('Capacitor Preferences failed, using localStorage:', capacitorError);
+                localStorage.removeItem(k);
+            }
         } catch (error) {
             console.error(`Error removing ${k} from storage:`, error);
         }
@@ -56,7 +83,13 @@ export class StorageUtil {
 
     static async clear(): Promise<void> {
         try {
-            await Preferences.clear();
+            // Try Capacitor Preferences first, fallback to localStorage
+            try {
+                await Preferences.clear();
+            } catch (capacitorError) {
+                console.warn('Capacitor Preferences failed, using localStorage:', capacitorError);
+                localStorage.clear();
+            }
         } catch (error) {
             console.error('Error clearing storage:', error);
         }
